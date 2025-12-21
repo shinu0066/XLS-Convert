@@ -145,9 +145,10 @@ export default function BlogPostPage() {
           <Image
             src={post.thumbnailImageUrl}
             alt={post.title}
-            layout="fill"
-            objectFit="cover"
+            fill
+            className="object-cover"
             priority
+            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
           />
         </div>
       )}

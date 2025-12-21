@@ -11,8 +11,7 @@ import CustomScriptInjector from '@/components/core/custom-script-injector';
 import MaintenanceModeOverlay from '@/components/core/maintenance-mode-overlay';
 import PopupInjector from '@/components/core/popup-injector';
 
-import type { GeneralSiteSettings } from '@/types/site-settings';
-import { subscribeToGeneralSettings } from '@/lib/firebase-settings-service';
+import { useSettings } from '@/context/settings-context';
 import { PREDEFINED_THEMES, DEFAULT_LIGHT_THEME_ID } from '@/config/themes';
 
 export const DEFAULT_SITE_NAME_FALLBACK = "Bank Statement Converter - Convert PDF File into Excel";
@@ -57,33 +56,16 @@ export default function AppInitializer({
 }) {
   const pathname = usePathname();
   const isAdminRoute = pathname.startsWith('/admin');
-  const [activeThemeId, setActiveThemeId] = useState<string>(DEFAULT_LIGHT_THEME_ID);
+  const { settings } = useSettings();
+  const activeThemeId = settings?.activeThemeId || DEFAULT_LIGHT_THEME_ID;
 
   // Initialize dynamic theme and metadata
   useEffect(() => {
-    // Set default metadata on mount
+    // Set default metadata on mount and update on pathname changes
     document.title = DEFAULT_SITE_NAME_FALLBACK;
     setMetaTag('name', 'description', DEFAULT_FALLBACK_DESCRIPTION);
     setMetaTag('property', 'og:title', DEFAULT_SITE_NAME_FALLBACK);
     setMetaTag('property', 'og:description', DEFAULT_FALLBACK_DESCRIPTION);
-    if (typeof window !== 'undefined') {
-        const canonicalUrl = window.location.origin + pathname;
-        setMetaTag('property', 'og:url', canonicalUrl);
-        setLinkTag('canonical', canonicalUrl);
-    }
-
-
-    // Subscribe to settings for dynamic updates
-    const unsubscribe = subscribeToGeneralSettings((settings) => {
-      const themeId = settings?.activeThemeId || DEFAULT_LIGHT_THEME_ID;
-      setActiveThemeId(themeId);
-    });
-
-    return () => unsubscribe();
-  }, []);
-
-  // Update OG URL and Canonical URL whenever pathname changes
-  useEffect(() => {
     if (typeof window !== 'undefined') {
         const canonicalUrl = window.location.origin + pathname;
         setMetaTag('property', 'og:url', canonicalUrl);

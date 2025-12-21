@@ -1,6 +1,7 @@
 
 "use client";
 
+import { memo } from 'react';
 import { useState, useEffect } from 'react';
 import { ShieldCheck, Download, BrainCircuit, Zap } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -22,7 +23,7 @@ interface FeatureSectionProps {
   siteTitle?: string; // Allow siteTitle to be passed as a prop
 }
 
-export default function FeatureSection({ siteTitle: propSiteTitle }: FeatureSectionProps) {
+const FeatureSection = memo(function FeatureSection({ siteTitle: propSiteTitle }: FeatureSectionProps) {
   const [displayedSiteTitle, setDisplayedSiteTitle] = useState<string>(propSiteTitle || GENERIC_APP_NAME);
   const { getTranslation } = useLanguage();
 
@@ -83,4 +84,6 @@ export default function FeatureSection({ siteTitle: propSiteTitle }: FeatureSect
       </div>
     </section>
   );
-}
+});
+
+export default FeatureSection;

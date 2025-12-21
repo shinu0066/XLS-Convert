@@ -57,9 +57,10 @@ export default function LoginPage() {
     try {
       await signIn(loginData);
       toast({ title: "Login Successful", description: "Welcome back!" });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred.";
       console.error("Login page error (Email/Pass):", error);
-      toast({ variant: "destructive", title: "Login Failed", description: error.message || "An unexpected error occurred." });
+      toast({ variant: "destructive", title: "Login Failed", description: errorMessage });
     } finally {
       setIsLoading(false);
     }
@@ -72,11 +73,20 @@ export default function LoginPage() {
       if (user) {
         toast({ title: "Google Sign-In Successful", description: "Welcome!" });
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Login page error (Google):", error);
       // Check if the error is the specific "popup closed by user" to avoid toasting for that
-      if (error.code !== 'auth/popup-closed-by-user') {
-        toast({ variant: "destructive", title: "Google Sign-In Failed", description: error.message || "Could not sign in with Google." });
+      const errorCode = 
+        error &&
+        typeof error === 'object' &&
+        'code' in error &&
+        typeof error.code === 'string'
+          ? error.code
+          : undefined;
+      
+      if (errorCode !== 'auth/popup-closed-by-user') {
+        const errorMessage = error instanceof Error ? error.message : "Could not sign in with Google.";
+        toast({ variant: "destructive", title: "Google Sign-In Failed", description: errorMessage });
       }
     } finally {
       setIsGoogleLoading(false);

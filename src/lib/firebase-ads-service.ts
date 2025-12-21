@@ -1,7 +1,10 @@
 
 import { doc, getDoc, setDoc, onSnapshot, type Unsubscribe, serverTimestamp } from 'firebase/firestore';
 import { firestore, auth } from './firebase'; // Added auth
-import type { AdSettings } from '@/types/site-settings';
+import type { GeneralSiteSettings } from '@/types/site-settings';
+
+// AdSettings is part of GeneralSiteSettings
+type AdSettings = Pick<GeneralSiteSettings, 'adLoaderScript'>;
 
 const ADS_SETTINGS_COLLECTION = 'site_settings';
 const ADS_SETTINGS_DOC_ID = 'ads_config';

@@ -66,35 +66,17 @@ export function AdminAuthForm({ mode, onSubmit, submitButtonText, isLoading = fa
     try {
       await onSubmit(values);
       // Success is handled by parent page (e.g., redirect)
-    } catch (err: any) {
+    } catch (err: unknown) {
       handleAuthError(err);
     } finally {
       setIsSubmitting(false);
     }
   }
 
-  function handleAuthError(err: any) {
-    let errorMessage = "An unexpected error occurred. Please try again.";
-    // Prefer err.message if it's a custom error thrown from hooks
-    if (err.message) {
-        errorMessage = err.message;
-    } else if (err.code) { // Fallback to Firebase error codes
-      switch (err.code) {
-        case 'auth/user-not-found':
-        case 'auth/wrong-password':
-        case 'auth/invalid-credential':
-          errorMessage = "Invalid email or password.";
-          break;
-        case 'auth/email-already-in-use':
-          errorMessage = "This email is already registered.";
-          break;
-        case 'auth/too-many-requests':
-            errorMessage = "Too many attempts. Please try again later.";
-            break;
-        default: 
-          errorMessage = `An unexpected error occurred: ${err.code || err.message || 'Unknown error'}`; 
-      }
-    }
+  function handleAuthError(err: unknown) {
+    // Use the centralized error message utility for consistency
+    const { getUserFriendlyErrorMessage } = require('@/types/errors');
+    const errorMessage = getUserFriendlyErrorMessage(err);
     setFormError(errorMessage);
   }
 

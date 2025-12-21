@@ -6,6 +6,8 @@ import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage
 import { firestore, storage, auth } from './firebase';
 import type { GeneralSiteSettings, SocialLink, CustomScript, PageSEOInfo, PaymentGatewaySetting, PaymentGatewayType } from '@/types/site-settings';
 import { DEFAULT_LIGHT_THEME_ID } from '@/config/themes';
+import { PermissionError, isFirebaseSDKError } from '@/types/errors';
+import { logError } from '@/lib/error-handler';
 // import { Landmark, CreditCard } from 'lucide-react'; // Icons are set in default settings now
 
 const SETTINGS_COLLECTION = 'site_settings';
@@ -100,11 +102,12 @@ function mergeSettings(savedData?: Partial<GeneralSiteSettings>): GeneralSiteSet
     const data = savedData || {};
 
     // Merge custom scripts: Start with defaults, then add any *new* saved scripts.
-    const defaultScriptIds = new Set(DEFAULT_GENERAL_SETTINGS.customScripts.map(s => s.id));
+    const defaultScripts = DEFAULT_GENERAL_SETTINGS.customScripts || [];
+    const defaultScriptIds = new Set(defaultScripts.map(s => s.id));
     const savedScripts = data.customScripts || [];
     const uniqueSavedScripts = savedScripts.filter(s => !defaultScriptIds.has(s.id));
     
-    const combinedScripts = [...DEFAULT_GENERAL_SETTINGS.customScripts];
+    const combinedScripts = [...defaultScripts];
     // For scripts with same ID, saved one overrides default one
     savedScripts.forEach(savedScript => {
         const index = combinedScripts.findIndex(ds => ds.id === savedScript.id);
@@ -155,26 +158,35 @@ export async function getGeneralSettings(): Promise<GeneralSiteSettings> {
     }
     return mergeSettings(); // Return fully merged defaults
   } catch (error) {
-    console.error("Error fetching general settings:", error);
+    logError(error, { operation: 'getGeneralSettings' });
+    
+    if (isFirebaseSDKError(error)) {
+      if (error.code === 'firestore/permission-denied') {
+        throw new PermissionError("You do not have permission to access settings.", 'site_settings', 'read');
+      }
+    }
+    
     throw error;
   }
 }
 
 export async function updateGeneralSettings(settings: Partial<GeneralSiteSettings>): Promise<void> {
+  const currentUser = auth.currentUser;
+  if (!currentUser) {
+    throw new PermissionError("Authentication required to update general settings.", 'site_settings', 'update');
+  }
+  
   try {
-    const currentUser = auth.currentUser;
-    console.log("Attempting to update general settings. Admin UID:", currentUser?.uid, "Settings:", settings);
-    if (!currentUser) {
-      throw new Error("Authentication required to update general settings.");
-    }
+    console.log("Attempting to update general settings. Admin UID:", currentUser.uid, "Settings:", settings);
 
     const docRef = doc(firestore, SETTINGS_COLLECTION, GENERAL_SETTINGS_DOC_ID);
     const cleanedSettings: Partial<GeneralSiteSettings> = {};
     for (const key in settings) {
       if (Object.prototype.hasOwnProperty.call(settings, key)) {
         const k = key as keyof GeneralSiteSettings;
-        if (settings[k] !== undefined) {
-          cleanedSettings[k] = settings[k];
+        const value = settings[k];
+        if (value !== undefined) {
+          (cleanedSettings as Record<string, unknown>)[k] = value;
         }
       }
     }
@@ -195,8 +207,19 @@ export async function updateGeneralSettings(settings: Partial<GeneralSiteSetting
     }
 
     await setDoc(docRef, settingsToSave, { merge: true });
+    console.log("Successfully updated general settings.");
   } catch (error) {
-    console.error("Error updating general settings in Firestore:", error);
+    logError(error, { 
+      operation: 'updateGeneralSettings', 
+      userId: currentUser.uid 
+    });
+    
+    if (isFirebaseSDKError(error)) {
+      if (error.code === 'firestore/permission-denied') {
+        throw new PermissionError("You do not have permission to update settings.", 'site_settings', 'update');
+      }
+    }
+    
     throw error;
   }
 }
@@ -254,8 +277,16 @@ export async function deleteSharedSiteLogo(logoUrl: string): Promise<void> {
     const storageRefInstance = ref(storage, logoUrl);
     await deleteObject(storageRefInstance);
     console.log("Successfully deleted old shared logo from Firebase Storage:", logoUrl);
-  } catch (error) {
-    if ((error as any).code === 'storage/object-not-found') {
+  } catch (error: unknown) {
+    const errorCode = 
+      error && 
+      typeof error === 'object' && 
+      'code' in error && 
+      typeof error.code === 'string'
+        ? error.code
+        : undefined;
+    
+    if (errorCode === 'storage/object-not-found') {
       console.warn('Old shared logo not found in storage, skipping deletion:', logoUrl);
     } else {
       console.error("Error deleting shared logo from Firebase Storage:", error);

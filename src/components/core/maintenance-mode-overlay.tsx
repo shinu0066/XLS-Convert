@@ -1,6 +1,7 @@
 
 "use client";
 
+import { memo } from 'react';
 import { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import type { GeneralSiteSettings } from '@/types/site-settings';
@@ -10,7 +11,7 @@ import { Construction } from 'lucide-react'; // Icon for maintenance
 
 const GENERIC_APP_NAME_FALLBACK = "Our Website";
 
-export default function MaintenanceModeOverlay() {
+const MaintenanceModeOverlay = memo(function MaintenanceModeOverlay() {
   const [settings, setSettings] = useState<GeneralSiteSettings | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const pathname = usePathname();
@@ -65,4 +66,6 @@ export default function MaintenanceModeOverlay() {
       </div>
     </div>
   );
-}
+});
+
+export default MaintenanceModeOverlay;

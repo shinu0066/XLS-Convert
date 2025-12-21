@@ -1,13 +1,13 @@
 
 "use client";
 
-import { collection, addDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, type FieldValue } from 'firebase/firestore';
 import { firestore } from './firebase';
 
 const CONVERSION_LOGS_COLLECTION = 'conversion_logs';
 
 export interface ConversionLogData {
-  timestamp: any; // Will be Firestore Server Timestamp
+  timestamp: FieldValue; // Firestore Server Timestamp
   userType: 'guest' | 'loggedIn';
   userId?: string;
 }

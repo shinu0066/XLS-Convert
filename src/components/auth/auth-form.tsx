@@ -56,7 +56,7 @@ export function AuthForm({ mode, onSubmit, submitButtonText, isLoading = false }
   const currentSchema = mode === 'signup' ? signupSchema : baseSchema;
 
   const form = useForm<AuthFormSubmitValues>({ // Use the most comprehensive type for form state
-    resolver: zodResolver(currentSchema),
+    resolver: zodResolver(currentSchema) as any, // Type assertion needed due to conditional schema
     defaultValues: {
       email: "",
       password: "",
@@ -70,28 +70,16 @@ export function AuthForm({ mode, onSubmit, submitButtonText, isLoading = false }
     setError(null);
     try {
       await onSubmit(values);
-    } catch (err: any) {
+    } catch (err: unknown) {
       handleAuthError(err);
     }
   }
 
-  function handleAuthError(err: any) {
-    if (err.code) {
-      switch (err.code) {
-        case 'auth/user-not-found':
-        case 'auth/wrong-password':
-        case 'auth/invalid-credential':
-          setError("Invalid email or password.");
-          break;
-        case 'auth/email-already-in-use':
-          setError("This email is already registered.");
-          break;
-        default:
-          setError(err.message || "An unexpected error occurred.");
-      }
-    } else {
-      setError(err.message || "An unexpected error occurred. Please try again.");
-    }
+  function handleAuthError(err: unknown) {
+    // Use the centralized error message utility for consistency
+    const { getUserFriendlyErrorMessage } = require('@/types/errors');
+    const errorMessage = getUserFriendlyErrorMessage(err);
+    setError(errorMessage);
   }
 
   return (

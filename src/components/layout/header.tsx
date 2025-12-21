@@ -1,15 +1,16 @@
 
 "use client";
 
+import { memo, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/hooks/use-auth';
 import { Button } from '@/components/ui/button';
 import AppLogo from './app-logo';
 import { Languages, Menu, User as UserIcon, LogOut, CreditCard, Settings, FileText } from 'lucide-react'; 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet';
-import { subscribeToGeneralSettings } from '@/lib/firebase-settings-service'; 
+import { useSettings } from '@/context/settings-context';
 import { VisuallyHidden } from '@/components/ui/visually-hidden';
 import { useLanguage } from '@/context/language-context';
 import { languages } from '@/config/translations';
@@ -25,33 +26,18 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 const GENERIC_APP_NAME_FALLBACK = "My App";
 
-export default function AppHeader() {
+const AppHeader = memo(function AppHeader() {
   const { currentUser, userProfile, signOut, loading: authLoading } = useAuth();
   const { setLanguage, getTranslation } = useLanguage();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const pathname = usePathname();
-  const [logoUrl, setLogoUrl] = useState<string | undefined | null>(undefined);
-  const [siteTitleForLogo, setSiteTitleForLogo] = useState<string>(GENERIC_APP_NAME_FALLBACK);
-  const [isLoadingSettings, setIsLoadingSettings] = useState(true);
+  const { settings, loading: isLoadingSettings } = useSettings();
 
   const isHomePage = pathname === '/';
+  const logoUrl = settings?.logoUrl;
+  const siteTitleForLogo = settings?.siteTitle || GENERIC_APP_NAME_FALLBACK;
 
-  useEffect(() => {
-    setIsLoadingSettings(true);
-    const unsubscribe = subscribeToGeneralSettings((settings) => {
-      if (settings) {
-        setLogoUrl(settings.logoUrl);
-        setSiteTitleForLogo(settings.siteTitle || GENERIC_APP_NAME_FALLBACK);
-      } else {
-        setLogoUrl(undefined);
-        setSiteTitleForLogo(GENERIC_APP_NAME_FALLBACK);
-      }
-      setIsLoadingSettings(false);
-    });
-    return () => unsubscribe();
-  }, []);
-
-  const getInitials = (firstName?: string, lastName?: string, email?: string) => {
+  const getInitials = useCallback((firstName?: string, lastName?: string, email?: string) => {
     if (firstName && lastName) {
       return `${firstName[0]}${lastName[0]}`;
     }
@@ -59,27 +45,34 @@ export default function AppHeader() {
       return email.slice(0, 2).toUpperCase();
     }
     return 'U';
-  };
+  }, []);
   
-  const navLinks = [
+  const navLinks = useMemo(() => [
     ...(!isHomePage ? [{ id: 'home', href: '/', labelKey: 'navHome' }] : []),
     { id: 'documents', href: '/documents', labelKey: 'navDocuments'},
     { id: 'pricing', href: '/pricing', labelKey: 'navPricing' },
-  ];
+  ], [isHomePage]);
 
-  const loggedOutLinks = [
+  const loggedOutLinks = useMemo(() => [
     ...navLinks,
     { id: 'login', href: '/login', labelKey: 'login' },
     { id: 'register', href: '/signup', labelKey: 'register' },
-  ];
+  ], [navLinks]);
 
-  const loggedInLinks = [
+  const loggedInLinks = useMemo(() => [
     ...navLinks,
     { id: 'settings', href: '/settings', labelKey: 'navSettings' },
-  ];
+  ], [navLinks]);
 
-  const mobileLinks = currentUser ? loggedInLinks : loggedOutLinks;
-  const desktopLinks = currentUser ? loggedInLinks : loggedOutLinks.filter(l => l.id !== 'register');
+  const mobileLinks = useMemo(() => 
+    currentUser ? loggedInLinks : loggedOutLinks,
+    [currentUser, loggedInLinks, loggedOutLinks]
+  );
+  
+  const desktopLinks = useMemo(() => 
+    currentUser ? loggedInLinks : loggedOutLinks.filter(l => l.id !== 'register'),
+    [currentUser, loggedInLinks, loggedOutLinks]
+  );
 
 
   return (
@@ -221,4 +214,6 @@ export default function AppHeader() {
       </div>
     </header>
   );
-}
+});
+
+export default AppHeader;

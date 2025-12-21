@@ -36,9 +36,10 @@ export default function EditBlogPostPage() {
           } else {
             setError("Blog post not found.");
           }
-        } catch (err: any) {
+        } catch (err: unknown) {
+          const errorMessage = err instanceof Error ? err.message : "Failed to load blog post details.";
           console.error("Error fetching blog post for edit:", err);
-          setError(err.message || "Failed to load blog post details.");
+          setError(errorMessage);
         } finally {
           setIsLoading(false);
         }

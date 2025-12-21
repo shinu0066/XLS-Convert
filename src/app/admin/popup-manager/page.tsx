@@ -72,6 +72,9 @@ export default function PopupManagerPage() {
 
   const renderPopupForm = (popupKey: keyof AllPopupSettings, icon: React.ElementType) => {
     const config = settings[popupKey];
+    if (!config || typeof config !== 'object' || !('id' in config)) {
+      return null;
+    }
     const IconComponent = icon;
 
     return (

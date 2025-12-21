@@ -12,6 +12,7 @@ import {
   Timestamp,
   orderBy,
   getDoc,
+  limit,
 } from 'firebase/firestore';
 import { firestore, auth } from './firebase';
 
@@ -87,32 +88,56 @@ export function base64ToPDF(base64Data: string, fileName: string): void {
 export async function getRecentUserDocuments(userId: string): Promise<StoredDocument[]> {
   if (!userId) return [];
 
-  // This query is simplified to avoid needing a composite index.
-  // It fetches all documents for a user, ordered by date.
-  const q = query(
-    collection(firestore, USER_FILES_COLLECTION),
-    where("userId", "==", userId),
-    orderBy("uploadedAt", "desc")
-  );
+  const twentyFourHoursAgo = Timestamp.fromMillis(Date.now() - (24 * 60 * 60 * 1000));
 
   try {
+    // Attempt server-side filtering with composite index
+    // REQUIRED FIREBASE COMPOSITE INDEX:
+    // Collection: userFiles
+    // Fields: userId (Ascending), uploadedAt (Descending)
+    // Create at: https://console.firebase.google.com/project/_/firestore/indexes
+    const q = query(
+      collection(firestore, USER_FILES_COLLECTION),
+      where("userId", "==", userId),
+      where("uploadedAt", ">=", twentyFourHoursAgo),
+      orderBy("uploadedAt", "desc"),
+      limit(50)
+    );
+
     const querySnapshot = await getDocs(q);
-    const allUserDocs = querySnapshot.docs.map(doc => ({
+    return querySnapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data(),
     } as StoredDocument));
 
-    // Client-side filtering for the 24-hour window.
-    const twentyFourHoursAgo = Date.now() - (24 * 60 * 60 * 1000);
-    const recentDocs = allUserDocs.filter(doc => 
-        doc.uploadedAt.toMillis() >= twentyFourHoursAgo
-    );
+  } catch (indexError: any) {
+    // Fallback to client-side filtering if composite index doesn't exist
+    console.warn('User files composite index not found. Using client-side filtering. Create index: userId (Ascending) + uploadedAt (Descending)', indexError);
     
-    return recentDocs;
+    try {
+      const fallbackQuery = query(
+        collection(firestore, USER_FILES_COLLECTION),
+        where("userId", "==", userId),
+        orderBy("uploadedAt", "desc"),
+        limit(50)
+      );
 
-  } catch (error) {
-    console.error("Error fetching user documents:", error);
-    throw error;
+      const querySnapshot = await getDocs(fallbackQuery);
+      const allUserDocs = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+      } as StoredDocument));
+
+      // Client-side filtering for the 24-hour window
+      const recentDocs = allUserDocs.filter(doc => 
+        doc.uploadedAt.toMillis() >= twentyFourHoursAgo.toMillis()
+      );
+      
+      return recentDocs;
+    } catch (error) {
+      console.error("Error fetching user documents:", error);
+      throw error;
+    }
   }
 }
 

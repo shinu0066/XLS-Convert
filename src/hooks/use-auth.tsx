@@ -160,8 +160,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return user;
       }
       return null;
-    } catch (error: any) {
-      if (error.code === 'auth/popup-closed-by-user') {
+    } catch (error: unknown) {
+      if (
+        error &&
+        typeof error === 'object' &&
+        'code' in error &&
+        error.code === 'auth/popup-closed-by-user'
+      ) {
         return null;
       }
       throw error as AuthError;

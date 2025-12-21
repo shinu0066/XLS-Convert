@@ -40,8 +40,9 @@ export default function AdminSignupPage() {
       await adminSignUp(values); 
       toast({ title: "Admin Account Created", description: "Please log in to continue." });
       router.push('/admin/login'); 
-    } catch (error: any) {
-      console.error("Admin Signup page error:", error.message);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      console.error("Admin Signup page error:", errorMessage);
     } finally {
       setIsSubmitting(false);
     }

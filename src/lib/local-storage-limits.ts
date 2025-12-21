@@ -177,7 +177,7 @@ export function checkConversionLimit(userId: string | null, conversionsRequested
         remaining: remainingPlanConversions,
         onPlan: true,
         planName: activePlan.name,
-        isTrial: isCurrentlyInTrial,
+        isTrial: !!isCurrentlyInTrial,
         trialEndsAt: activePlan.trialEndsAt,
       };
     } else {
@@ -187,7 +187,7 @@ export function checkConversionLimit(userId: string | null, conversionsRequested
         onPlan: true,
         planName: activePlan.name,
         isPlanExhausted: true,
-        isTrial: isCurrentlyInTrial,
+        isTrial: !!isCurrentlyInTrial,
         trialEndsAt: activePlan.trialEndsAt,
       };
     }

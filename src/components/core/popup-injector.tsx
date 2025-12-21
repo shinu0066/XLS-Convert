@@ -1,6 +1,7 @@
 
 "use client";
 
+import { memo } from 'react';
 import { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import type { AllPopupSettings, PopupConfig } from '@/types/popup-settings';
@@ -21,7 +22,7 @@ interface DismissedPopupInfo {
   popupId: string;
 }
 
-export default function PopupInjector() {
+const PopupInjector = memo(function PopupInjector() {
   const [popupSettings, setPopupSettings] = useState<AllPopupSettings>(DEFAULT_POPUP_SETTINGS);
   const [dismissedPopups, setDismissedPopups] = useState<Record<string, DismissedPopupInfo>>({});
   const pathname = usePathname();
@@ -109,4 +110,6 @@ export default function PopupInjector() {
       )}
     </>
   );
-}
+});
+
+export default PopupInjector;

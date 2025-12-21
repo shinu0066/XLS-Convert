@@ -166,13 +166,21 @@ export default function GeneralSettingsPage() {
         try {
           await deleteSharedSiteLogo(initialSettings.logoUrl);
           toast({ title: 'Old Site Logo Cleared', description: 'The previous site logo has been removed from storage.' });
-        } catch (delError: any) {
-           if (delError.code !== 'storage/object-not-found') {
-              console.warn("Old logo deletion issue (non-fatal):", delError);
-              toast({ variant: 'destructive', title: 'Logo Deletion Issue', description: 'Could not remove the old logo from storage, but settings were saved.' });
-           } else {
-             console.log("Old logo was not found in storage, nothing to delete for path:", initialSettings.logoUrl);
-           }
+        } catch (delError: unknown) {
+          const errorCode = 
+            delError &&
+            typeof delError === 'object' &&
+            'code' in delError &&
+            typeof delError.code === 'string'
+              ? delError.code
+              : undefined;
+          
+          if (errorCode !== 'storage/object-not-found') {
+            console.warn("Old logo deletion issue (non-fatal):", delError);
+            toast({ variant: 'destructive', title: 'Logo Deletion Issue', description: 'Could not remove the old logo from storage, but settings were saved.' });
+          } else {
+            console.log("Old logo was not found in storage, nothing to delete for path:", initialSettings.logoUrl);
+          }
         }
       }
 
@@ -196,9 +204,10 @@ export default function GeneralSettingsPage() {
       // No logoFile or logoPreview to manage anymore
       
       toast({ title: 'General Settings Saved', description: 'Site settings have been updated successfully. Logo feature is now managed separately or disabled.' });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Could not save settings.';
       console.error("Error during save process:", error);
-      toast({ variant: 'destructive', title: 'Save Error', description: error.message || 'Could not save settings.' });
+      toast({ variant: 'destructive', title: 'Save Error', description: errorMessage });
     } finally {
       setIsSaving(false);
     }

@@ -43,9 +43,17 @@ export default function ForgotPasswordPage() {
     try {
       await sendPasswordResetEmail(data.email);
       setIsSuccess(true);
-    } catch (error: any) {
+    } catch (error: unknown) {
       let errorMessage = "An unexpected error occurred.";
-      if (error.code === 'auth/user-not-found') {
+      const errorCode = 
+        error &&
+        typeof error === 'object' &&
+        'code' in error &&
+        typeof error.code === 'string'
+          ? error.code
+          : undefined;
+      
+      if (errorCode === 'auth/user-not-found') {
         // To prevent user enumeration, we can show a generic success message.
         // Or be explicit if we don't mind confirming an email exists.
         // Let's be explicit for better UX for now.

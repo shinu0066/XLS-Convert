@@ -1,12 +1,18 @@
 
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import FileUploader from '@/components/core/file-uploader';
 import DataPreview from '@/components/core/data-preview';
 import LimitDialog from '@/components/core/limit-dialog';
 import LoadingSpinner from '@/components/core/loading-spinner';
-import FeatureSection from '@/components/core/feature-section';
+import dynamic from 'next/dynamic';
+
+// Lazy load FeatureSection to reduce initial bundle size
+const FeatureSection = dynamic(() => import('@/components/core/feature-section'), {
+  loading: () => <div className="animate-pulse h-64 bg-muted rounded-lg" />,
+  ssr: true, // Keep SSR for SEO
+});
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -15,13 +21,11 @@ import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { checkConversionLimit, recordConversion, formatTime, type LimitStatus, getActivePlan, type ActivePlan } from '@/lib/local-storage-limits';
 import { exportToExcel } from '@/lib/excel-export';
-import { extractTextFromPdf, convertAllPdfPagesToImageUris, formatStructuredDataForExcel } from '@/lib/pdf-utils';
-import { extractTextFromImage as extractTextFromImageAI } from '@/ai/flows/extract-text-from-image';
-import { structurePdfData as structurePdfDataAI, type StructuredPdfDataOutput, type Transaction } from '@/ai/flows/structure-pdf-data-flow';
-import type { GeneralSiteSettings } from '@/types/site-settings';
-import { subscribeToGeneralSettings } from '@/lib/firebase-settings-service';
+import type { StructuredPdfDataOutput, Transaction } from '@/ai/flows/structure-pdf-data-flow';
+import { useSettings } from '@/context/settings-context';
 import { usePathname } from 'next/navigation';
 import { useLanguage } from '@/context/language-context';
+import { ProcessingCancelledError, isProcessingCancelledError } from '@/types/errors';
 
 const MIN_TEXT_LENGTH_FOR_TEXT_PDF = 100;
 const GENERIC_APP_NAME = "PDF to Excel Converter";
@@ -31,7 +35,7 @@ const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
 
 interface StoredExcelFile {
     name: string;
-    data: string[][];
+    data: Array<Array<string | number | null>>;
     timestamp: number;
 }
 
@@ -57,7 +61,7 @@ const updateMeta = (name: string, content: string) => {
 
 export default function HomePage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [excelReadyData, setExcelReadyData] = useState<string[][] | null>(null);
+  const [excelReadyData, setExcelReadyData] = useState<Array<Array<string | number | null>> | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [loadingStep, setLoadingStep] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
@@ -74,9 +78,15 @@ export default function HomePage() {
   const { currentUser } = useAuth();
   const { toast } = useToast();
   const pathname = usePathname();
-  const [displayedSiteTitle, setDisplayedSiteTitle] = useState<string>(GENERIC_APP_NAME);
+  const { settings } = useSettings();
   const [activePlan, setActivePlan] = useState<ActivePlan | null>(null);
   const { getTranslation } = useLanguage();
+  const abortControllerRef = useRef<AbortController | null>(null);
+  
+  const displayedSiteTitle = useMemo(() => 
+    settings?.siteTitle || GENERIC_APP_NAME,
+    [settings?.siteTitle]
+  );
 
   useEffect(() => {
     if (currentUser) {
@@ -87,41 +97,59 @@ export default function HomePage() {
   }, [currentUser]);
 
   useEffect(() => {
-    const unsubscribe = subscribeToGeneralSettings((settings) => {
-      const currentSiteTitle = settings?.siteTitle || GENERIC_APP_NAME;
-      setDisplayedSiteTitle(currentSiteTitle);
+    if (!settings) return;
+    
+    const currentSiteTitle = settings.siteTitle || GENERIC_APP_NAME;
+    const seoData = settings.seoSettings?.[pathname];
+    const pageTitle = seoData?.title || currentSiteTitle;
+    const pageDescription = seoData?.description || "Easily convert your PDF files to structured Excel spreadsheets with AI.";
+    
+    document.title = pageTitle;
+    updateMeta('description', pageDescription);
 
-      const seoData = settings?.seoSettings?.[pathname];
-      const pageTitle = seoData?.title || currentSiteTitle;
-      const pageDescription = seoData?.description || "Easily convert your PDF files to structured Excel spreadsheets with AI.";
-      
-      document.title = pageTitle;
-      updateMeta('description', pageDescription);
+    let ogTitleTag = document.querySelector('meta[property="og:title"]') as HTMLMetaElement;
+    if (!ogTitleTag) {
+        ogTitleTag = document.createElement('meta');
+        ogTitleTag.setAttribute('property', 'og:title');
+        document.head.appendChild(ogTitleTag);
+    }
+    ogTitleTag.setAttribute('content', pageTitle);
 
-      let ogTitleTag = document.querySelector('meta[property="og:title"]') as HTMLMetaElement;
-      if (!ogTitleTag) {
-          ogTitleTag = document.createElement('meta');
-          ogTitleTag.setAttribute('property', 'og:title');
-          document.head.appendChild(ogTitleTag);
+    if (seoData?.keywords) {
+      let keywordsTag = document.querySelector('meta[name="keywords"]');
+      if (!keywordsTag) {
+        keywordsTag = document.createElement('meta');
+        keywordsTag.setAttribute('name', 'keywords');
+        document.head.appendChild(keywordsTag);
       }
-      ogTitleTag.setAttribute('content', pageTitle);
+      keywordsTag.setAttribute('content', seoData.keywords);
+    }
+  }, [settings, pathname]);
 
-      if (seoData?.keywords) {
-        let keywordsTag = document.querySelector('meta[name="keywords"]');
-        if (!keywordsTag) {
-          keywordsTag = document.createElement('meta');
-          keywordsTag.setAttribute('name', 'keywords');
-          document.head.appendChild(keywordsTag);
-        }
-        keywordsTag.setAttribute('content', seoData.keywords);
+  // Cleanup: abort any ongoing processing when component unmounts
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
       }
-    });
-    return () => unsubscribe();
-  }, [pathname]);
+    };
+  }, []);
 
-  const handleFileSelect = async (files: File[]) => {
+  const handleFileSelect = useCallback(async (files: File[]) => {
     if (!files || files.length === 0) return;
     const fileToProcess = files[0];
+
+    // Check file size and warn for very large files (>50MB)
+    const MAX_FILE_SIZE_WARNING = 50 * 1024 * 1024; // 50MB
+    if (fileToProcess.size > MAX_FILE_SIZE_WARNING) {
+      const fileSizeMB = (fileToProcess.size / (1024 * 1024)).toFixed(1);
+      toast({ 
+        variant: "default", 
+        title: "Large File Detected", 
+        description: `This file is ${fileSizeMB}MB. Processing may take longer and use more memory.`,
+        duration: 5000
+      });
+    }
 
     const userId = currentUser ? currentUser.uid : null;
     const limitStatus = checkConversionLimit(userId);
@@ -144,52 +172,137 @@ export default function HomePage() {
     setSelectedFile(fileToProcess); // Set selected file early
     setLoadingStep("Processing your PDF, please wait...");
 
+    // Create new AbortController for this processing operation
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+    const signal = abortController.signal;
+
+    let fileBuffer: ArrayBuffer | null = null;
     try {
-      const fileBuffer = await fileToProcess.arrayBuffer();
+      fileBuffer = await fileToProcess.arrayBuffer();
       
+      if (signal.aborted) {
+        throw new ProcessingCancelledError();
+      }
+      
+      setLoadingStep("Loading processing modules...");
+      
+      // Dynamically import heavy dependencies to reduce initial bundle size
+      const [
+        { extractTextFromPdf, convertPdfPagesToImageUrisIncremental, formatStructuredDataForExcel },
+        { extractTextFromImage: extractTextFromImageAI },
+        { structurePdfData: structurePdfDataAI }
+      ] = await Promise.all([
+        import('@/lib/pdf-utils'),
+        import('@/ai/flows/extract-text-from-image'),
+        import('@/ai/flows/structure-pdf-data-flow')
+      ]);
+
       setLoadingStep("Extracting text from PDF...");
       // Pass a clone of the buffer to prevent it from being detached.
-      const directText = await extractTextFromPdf(fileBuffer.slice(0));
+      const directText = await extractTextFromPdf(fileBuffer.slice(0), signal);
       let rawTextOutput: string;
 
       if (directText && directText.length > MIN_TEXT_LENGTH_FOR_TEXT_PDF) {
         rawTextOutput = directText;
       } else {
         setLoadingStep("PDF has no text, using OCR to scan pages...");
-        // Pass another clone to the image conversion function.
-        const imageDataUris = await convertAllPdfPagesToImageUris(fileBuffer.slice(0));
+        // Use incremental processing to avoid loading all pages into memory at once
         let ocrTextFromAllPages = '';
-        for (let i = 0; i < imageDataUris.length; i++) {
-          setLoadingStep(`Scanning page ${i + 1} of ${imageDataUris.length}...`);
-          const aiOcrResult = await extractTextFromImageAI({ photoDataUri: imageDataUris[i] });
-          if (aiOcrResult?.extractedText) ocrTextFromAllPages += aiOcrResult.extractedText + '\n\n';
-        }
+        
+        await convertPdfPagesToImageUrisIncremental(
+          fileBuffer.slice(0),
+          async (imageUri, pageNum, totalPages) => {
+            if (signal.aborted) {
+              throw new ProcessingCancelledError();
+            }
+            
+            setLoadingStep(`Scanning page ${pageNum} of ${totalPages}...`);
+            
+            try {
+              // Check for cancellation before calling server action
+              if (signal.aborted) {
+                throw new ProcessingCancelledError();
+              }
+              const result = await extractTextFromImageAI({ photoDataUri: imageUri });
+              if (result?.extractedText) {
+                ocrTextFromAllPages += result.extractedText + '\n\n';
+              }
+            } catch (error) {
+              // Handle cancellation
+              if (isProcessingCancelledError(error) || (error instanceof Error && error.name === 'AbortError')) {
+                throw error;
+              }
+              console.error(`Error processing page ${pageNum}:`, error);
+              // Continue with other pages even if one fails
+              console.warn(`Page ${pageNum} OCR failed, continuing with other pages...`);
+            }
+            // Image URI is automatically released after callback completes
+          },
+          signal
+        );
+        
         if (!ocrTextFromAllPages) throw new Error("OCR failed to extract any text from the document.");
         rawTextOutput = ocrTextFromAllPages;
       }
 
+      if (signal.aborted) {
+        throw new ProcessingCancelledError();
+      }
+
       setLoadingStep("Structuring data with AI...");
+      // Check for cancellation before calling server action (AbortSignal cannot be passed to server actions)
+      if (signal.aborted) {
+        throw new ProcessingCancelledError();
+      }
       const structuredDataResult = await structurePdfDataAI({ rawText: rawTextOutput });
+
+      // Clear raw text output to free memory (no longer needed after structuring)
+      rawTextOutput = '';
 
       setLoadingStep("Preparing Excel data...");
       const formattedData = formatStructuredDataForExcel(structuredDataResult);
       setExcelReadyData(formattedData);
       
+      // Clear structured data to free memory (formatted data is what we need)
+      // Note: structuredDataResult is a local variable, will be GC'd automatically
+      
       recordConversion(userId);
       toast({ title: "Conversion Successful", description: "Your data is ready for download." });
 
-    } catch (err: any) {
-      const errorMessage = err.message || "An unknown error occurred during conversion.";
-      console.error("Detailed error in handleFileSelect:", err);
-      setError(errorMessage);
-      toast({ variant: "destructive", title: "Conversion Failed", description: errorMessage, duration: 9000 });
+    } catch (err: unknown) {
+      // Handle cancellation gracefully
+      if (isProcessingCancelledError(err) || (err instanceof Error && err.name === 'AbortError')) {
+        setError(null);
+        setSelectedFile(null);
+        setExcelReadyData(null);
+        toast({ title: "Processing Cancelled", description: "The conversion was cancelled.", duration: 3000 });
+      } else {
+        const errorMessage = err instanceof Error ? err.message : "An unknown error occurred during conversion.";
+        console.error("Detailed error in handleFileSelect:", err);
+        setError(errorMessage);
+        toast({ variant: "destructive", title: "Conversion Failed", description: errorMessage, duration: 9000 });
+        // Clear file selection on error to free memory
+        setSelectedFile(null);
+        setExcelReadyData(null);
+      }
     } finally {
+      // Clear file buffer reference to help with garbage collection
+      fileBuffer = null;
+      // Clear abort controller reference
+      abortControllerRef.current = null;
       setIsLoading(false);
       setLoadingStep("");
     }
-  };
+  }, [currentUser, toast]);
 
-  const handleDownload = () => {
+  const handleCancel = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+  }, []);
+
+  const handleDownload = useCallback(() => {
     if (excelReadyData && selectedFile) {
         const originalFileName = selectedFile.name.replace(/\.[^/.]+$/, "") + ".xlsx";
         exportToExcel(excelReadyData, originalFileName);
@@ -225,15 +338,21 @@ export default function HomePage() {
                 toast({ variant: "destructive", title: "Could Not Save History", description: "There was an error saving this file to your local history." });
             }
         }
+        
+        // Clear large data arrays from state after download to free memory
+        setTimeout(() => {
+          setExcelReadyData(null);
+          setSelectedFile(null);
+        }, 1000); // Small delay to ensure download started
     }
-};
+  }, [excelReadyData, selectedFile, toast]);
 
-  const handleClearSelection = () => {
+  const handleClearSelection = useCallback(() => {
     setSelectedFile(null);
     setExcelReadyData(null);
     setError(null);
     setLoadingStep("");
-  };
+  }, []);
 
   return (
     <div className="space-y-8">
@@ -277,8 +396,13 @@ export default function HomePage() {
           )}
 
           {isLoading && (
-            <div className="py-10">
+            <div className="py-10 space-y-4">
               <LoadingSpinner message={loadingStep || 'Processing...'} />
+              <div className="flex justify-center">
+                <Button variant="outline" onClick={handleCancel}>
+                  Cancel Processing
+                </Button>
+              </div>
             </div>
           )}
 

@@ -102,8 +102,9 @@ export const AdminAuthProvider: React.FC<{ children: ReactNode }> = ({ children 
       }
       setLoading(false); 
       return null;
-    } catch (error: any) {
-      console.error("Admin Sign in error:", error.message || error);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error("Admin Sign in error:", errorMessage);
       setAdminUser(null); 
       setLoading(false); 
       throw error; 

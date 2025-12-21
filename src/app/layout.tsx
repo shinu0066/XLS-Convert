@@ -7,11 +7,16 @@ import { AuthProvider } from '@/hooks/use-auth';
 import { Toaster } from '@/components/ui/toaster';
 import { usePathname } from 'next/navigation';
 import { LanguageProvider } from '@/context/language-context';
+import { SettingsProvider } from '@/context/settings-context';
 import AppInitializer, { DEFAULT_SITE_NAME_FALLBACK } from '@/components/core/app-initializer';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { queryClient } from '@/lib/react-query-client';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
   subsets: ['latin'],
+  display: 'swap',
+  preload: true,
 });
 
 // Schema.org data is now simplified to avoid hydration errors.
@@ -66,16 +71,20 @@ export default function RootLayout({
 
       </head>
       <body className={`${geistSans.variable} antialiased font-sans flex flex-col min-h-screen`} suppressHydrationWarning={true}>
-        <AuthProvider>
-          <LanguageProvider>
-            <AppInitializer>
-              <main className={mainClassName}>
-                {children}
-              </main>
-            </AppInitializer>
-            <Toaster />
-          </LanguageProvider>
-        </AuthProvider>
+        <QueryClientProvider client={queryClient}>
+          <AuthProvider>
+            <LanguageProvider>
+              <SettingsProvider>
+                <AppInitializer>
+                  <main className={mainClassName}>
+                    {children}
+                  </main>
+                </AppInitializer>
+                <Toaster />
+              </SettingsProvider>
+            </LanguageProvider>
+          </AuthProvider>
+        </QueryClientProvider>
       </body>
     </html>
   );

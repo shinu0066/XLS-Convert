@@ -109,8 +109,9 @@ export default function AdminDashboardPage() {
       const data = await fetchAllWebsiteAnalyticsData();
       setWebsiteAnalytics(data);
       // toast({ title: "Analytics Loaded", description: "Website visitor data (mocked) loaded." });
-    } catch (error: any) {
-      toast({ variant: "destructive", title: "Analytics Error", description: `Failed to fetch website analytics: ${error.message}` });
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      toast({ variant: "destructive", title: "Analytics Error", description: `Failed to fetch website analytics: ${errorMessage}` });
       setWebsiteAnalytics(initialAnalyticsData); // Fallback
     } finally {
       setIsLoadingAnalytics(false);

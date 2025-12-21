@@ -40,8 +40,9 @@ export default function AdminLoginPage() {
     try {
       await adminSignIn(values);
       toast({ title: "Admin Login Successful", description: "Redirecting to dashboard..." });
-    } catch (error: any) {
-      console.error("Admin Login page caught specific error:", error.message);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      console.error("Admin Login page caught specific error:", errorMessage);
     } finally {
       setIsSubmitting(false);
     }

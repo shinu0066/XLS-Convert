@@ -1,3 +1,4 @@
+import type { Timestamp, FieldValue } from 'firebase/firestore';
 
 export type PopupType = 'bottom' | 'top-navbar' | 'center-screen';
 
@@ -10,7 +11,7 @@ export interface PopupConfig {
   ctaText?: string;
   ctaLink?: string;
   delaySeconds?: number; // For center popup, in seconds
-  lastUpdated?: any; // Firestore serverTimestamp
+  lastUpdated?: Timestamp | FieldValue; // Firestore serverTimestamp or Timestamp
 }
 
 // Defines the structure for storing all popup configurations together
@@ -19,7 +20,7 @@ export interface AllPopupSettings {
   topNavbarPopup: PopupConfig;
   centerScreenPopup: PopupConfig;
   // Potentially add a global lastUpdated timestamp for the whole config document
-  lastUpdated?: any;
+  lastUpdated?: Timestamp | FieldValue;
 }
 
 export const DEFAULT_POPUP_SETTINGS: AllPopupSettings = {

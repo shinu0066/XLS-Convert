@@ -17,7 +17,7 @@ import { useToast } from '@/hooks/use-toast';
 import LoadingSpinner from '@/components/core/loading-spinner';
 import { slugify } from '@/lib/utils';
 import { createBlogPost, updateBlogPost, uploadBlogThumbnail, checkSlugExists } from '@/lib/firebase-blog-service';
-import type { BlogPost } from '@/types/blog';
+import type { BlogPost, BlogPostStatus } from '@/types/blog';
 import { AlertCircle, CheckCircle, UploadCloud, XCircle, Bold, Italic, Underline, Strikethrough, List, ListOrdered, Heading1, Heading2, Heading3, Link as LinkIcon, Image as ImageIcon, Pilcrow, AlignLeft, AlignCenter, AlignRight, Quote, Code, Minus } from 'lucide-react';
 
 import { useEditor, EditorContent, type Editor } from '@tiptap/react';
@@ -124,7 +124,8 @@ export default function BlogPostForm({ existingPost }: BlogPostFormProps) {
   }, [watchedTitle, slugManuallyEdited, setValue, existingPost]);
   
   const debouncedCheckSlug = useCallback(
-    debounce(async (slugToTest: string) => {
+    debounce(async (slugToTest: unknown) => {
+      if (typeof slugToTest !== 'string') return;
       if (!slugToTest) {
         setSlugAvailable(null);
         return;
@@ -160,7 +161,10 @@ export default function BlogPostForm({ existingPost }: BlogPostFormProps) {
   };
 
   const onSubmitHandler: SubmitHandler<BlogPostFormValues> = async (data, event) => {
-    const clickedButton = event?.nativeEvent.submitter;
+    const nativeEvent = event?.nativeEvent;
+    const clickedButton = nativeEvent && 'submitter' in nativeEvent 
+      ? (nativeEvent.submitter as HTMLButtonElement | null)
+      : null;
     const statusToSet = clickedButton?.id === 'publish-button' ? 'published' : 'draft';
     
     setIsLoading(true);
@@ -181,11 +185,12 @@ export default function BlogPostForm({ existingPost }: BlogPostFormProps) {
         thumbnailUrl = null; 
       }
 
-      const postDataToSave = {
-        ...data,
-        status: statusToSet,
-        content: data.content, 
+      const postDataToSave: Omit<BlogPost, 'id' | 'createdAt' | 'updatedAt' | 'slug'> = {
+        title: data.title,
+        shortDescription: data.shortDescription,
+        content: data.content,
         thumbnailImageUrl: thumbnailUrl,
+        status: statusToSet as BlogPostStatus,
       };
       
       if (existingPost?.id) {
@@ -197,9 +202,10 @@ export default function BlogPostForm({ existingPost }: BlogPostFormProps) {
       }
       router.push('/admin/blog-manager');
       router.refresh(); 
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Could not save the blog post.";
       console.error("Error saving blog post:", error);
-      toast({ variant: "destructive", title: "Save Error", description: error.message || "Could not save the blog post." });
+      toast({ variant: "destructive", title: "Save Error", description: errorMessage });
     } finally {
       setIsLoading(false);
       setIsUploading(false);
@@ -263,7 +269,7 @@ export default function BlogPostForm({ existingPost }: BlogPostFormProps) {
           <div className="flex items-center gap-4">
             {thumbnailPreview ? (
               <div className="relative w-32 h-32 rounded-md overflow-hidden border">
-                <Image src={thumbnailPreview} alt="Thumbnail preview" layout="fill" objectFit="cover" data-ai-hint="blog thumbnail" />
+                <Image src={thumbnailPreview} alt="Thumbnail preview" fill className="object-cover" sizes="128px" data-ai-hint="blog thumbnail" />
               </div>
             ) : (
               <div className="w-32 h-32 rounded-md border border-dashed flex items-center justify-center bg-muted/50">
@@ -403,7 +409,7 @@ export default function BlogPostForm({ existingPost }: BlogPostFormProps) {
   );
 }
 
-function debounce<F extends (...args: any[]) => any>(func: F, waitFor: number) {
+function debounce<F extends (...args: unknown[]) => unknown>(func: F, waitFor: number) {
   let timeout: ReturnType<typeof setTimeout> | null = null;
 
   const debounced = (...args: Parameters<F>) => {

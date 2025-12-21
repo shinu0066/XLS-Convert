@@ -85,7 +85,7 @@ export default function BlogsPage() {
     try {
       // Use the seed data directly
       setBlogPosts(seedPosts);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Error loading blog posts:", err);
       setError("Failed to load blog posts. Please try again later.");
     } finally {
@@ -142,9 +142,9 @@ export default function BlogsPage() {
                   <Image
                     src={post.thumbnailImageUrl || `https://placehold.co/800x400.png`}
                     alt={post.title || 'Blog post thumbnail'}
-                    layout="fill"
-                    objectFit="cover"
-                    className="transition-transform duration-300 group-hover:scale-105"
+                    fill
+                    className="object-cover transition-transform duration-300 group-hover:scale-105"
+                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                     data-ai-hint="blog thumbnail"
                   />
                 </Link>

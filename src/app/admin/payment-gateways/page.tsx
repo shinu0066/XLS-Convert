@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect, useCallback, type FormEvent, type ChangeEvent } from 'react';
+import React, { useState, useEffect, useCallback, type FormEvent, type ChangeEvent } from 'react';
 import * as LucideIcons from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -107,9 +107,10 @@ export default function PaymentGatewaysPage() {
     try {
       await updateGeneralSettings({ paymentGateways: settings.paymentGateways });
       toast({ title: 'Payment Gateway Settings Saved', description: 'Your configurations have been updated successfully.' });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Could not save settings.';
       console.error("Error saving payment gateway settings:", error);
-      toast({ variant: 'destructive', title: 'Save Error', description: error.message || 'Could not save settings.' });
+      toast({ variant: 'destructive', title: 'Save Error', description: errorMessage });
     } finally {
       setIsSaving(false);
     }
@@ -133,12 +134,16 @@ export default function PaymentGatewaysPage() {
         <CardContent>
           <Accordion type="multiple" className="w-full space-y-4">
             {(settings.paymentGateways || []).map((gateway) => {
-              const IconComponent = LucideIcons[gateway.iconName as keyof typeof LucideIcons] || LucideIcons.Landmark;
+              const IconName = gateway.iconName as keyof typeof LucideIcons;
+              const IconComponent = (IconName && IconName in LucideIcons && typeof LucideIcons[IconName] === 'function')
+                ? (LucideIcons[IconName] as React.ComponentType<React.SVGProps<SVGSVGElement>>)
+                : LucideIcons.Landmark;
+              const Icon = IconComponent;
               return (
                 <AccordionItem value={gateway.id} key={gateway.id} className="border rounded-lg shadow-sm bg-card">
                   <AccordionTrigger className="px-6 py-4 hover:no-underline text-lg font-medium text-primary">
                     <div className="flex items-center gap-3">
-                      <IconComponent className="h-6 w-6" />
+                      <Icon className="h-6 w-6" />
                       {gateway.name}
                     </div>
                   </AccordionTrigger>

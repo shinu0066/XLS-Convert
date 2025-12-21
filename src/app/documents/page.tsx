@@ -22,7 +22,7 @@ const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
 
 interface StoredExcelFile {
     name: string;
-    data: string[][];
+    data: Array<Array<string | number | null>>;
     timestamp: number;
 }
 
@@ -97,7 +97,7 @@ export default function DocumentsPage() {
         }
 
         try {
-            let combinedData: string[][] = [];
+            let combinedData: Array<Array<string | number | null>> = [];
             let headerTaken = false;
 
             // Sort files from oldest to newest to combine them chronologically
@@ -107,13 +107,19 @@ export default function DocumentsPage() {
                 if (!file.data || file.data.length === 0) return;
 
                 if (!headerTaken && file.data.length > 0) {
-                    combinedData.push(file.data[0]); // Add header from the first valid file
-                    headerTaken = true;
+                    const headerRow = file.data[0];
+                    if (Array.isArray(headerRow)) {
+                      combinedData.push(headerRow.map(cell => String(cell ?? ''))); // Add header from the first valid file
+                      headerTaken = true;
+                    }
                 }
                 
                 // Add data rows (skip header), only if they exist
                 if (file.data.length > 1) {
-                    combinedData.push(...file.data.slice(1));
+                    const dataRows = file.data.slice(1).map(row => 
+                      Array.isArray(row) ? row.map(cell => String(cell ?? '')) : []
+                    );
+                    combinedData.push(...dataRows);
                 }
             });
             

@@ -58,9 +58,10 @@ export default function SignupPage() {
     try {
       await signUp(signupData);
       toast({ title: "Signup Successful", description: `Welcome to ${displayedSiteTitle}!` });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred.";
       console.error("Signup page error (Email/Pass):", error);
-      toast({ variant: "destructive", title: "Signup Failed", description: error.message || "An unexpected error occurred." });
+      toast({ variant: "destructive", title: "Signup Failed", description: errorMessage });
     } finally {
       setIsLoading(false);
     }
@@ -73,11 +74,20 @@ export default function SignupPage() {
       if (user) {
         toast({ title: "Google Sign-Up Successful", description: `Welcome to ${displayedSiteTitle}!` });
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Signup page error (Google):", error);
       // Check if the error is the specific "popup closed by user" to avoid toasting for that
-      if (error.code !== 'auth/popup-closed-by-user') {
-        toast({ variant: "destructive", title: "Google Sign-Up Failed", description: error.message || "Could not sign up with Google." });
+      const errorCode = 
+        error &&
+        typeof error === 'object' &&
+        'code' in error &&
+        typeof error.code === 'string'
+          ? error.code
+          : undefined;
+      
+      if (errorCode !== 'auth/popup-closed-by-user') {
+        const errorMessage = error instanceof Error ? error.message : "Could not sign up with Google.";
+        toast({ variant: "destructive", title: "Google Sign-Up Failed", description: errorMessage });
       }
     } finally {
       setIsGoogleLoading(false);

@@ -1,6 +1,7 @@
 
 "use client";
 
+import { memo } from 'react';
 import Link from 'next/link';
 import AppLogo from './app-logo';
 import { useState, useEffect } from 'react';
@@ -26,7 +27,7 @@ const DEFAULT_SOCIAL_LINKS: SocialLink[] = PREDEFINED_SOCIAL_MEDIA_PLATFORMS.map
 }));
 
 
-export default function AppFooter() {
+const AppFooter = memo(function AppFooter() {
   const [logoUrl, setLogoUrl] = useState<string | undefined | null>(undefined);
   const [socialLinks, setSocialLinks] = useState<SocialLink[]>(DEFAULT_SOCIAL_LINKS);
   const [displayedSiteTitle, setDisplayedSiteTitle] = useState<string>(GENERIC_APP_NAME_FALLBACK);
@@ -103,4 +104,6 @@ export default function AppFooter() {
       </div>
     </footer>
   );
-}
+});
+
+export default AppFooter;

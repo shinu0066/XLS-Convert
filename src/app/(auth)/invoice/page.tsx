@@ -24,13 +24,13 @@ function InvoiceContent() {
   const router = useRouter();
   const invoiceRef = useRef<HTMLDivElement>(null);
   
-  const [siteSettings, setSiteSettings] = useState({ title: GENERIC_APP_NAME, logoUrl: null });
+  const [siteSettings, setSiteSettings] = useState<{ title: string; logoUrl: string | null }>({ title: GENERIC_APP_NAME, logoUrl: null });
   const [isDownloading, setIsDownloading] = useState(false);
 
   useEffect(() => {
     const unsubscribe = subscribeToGeneralSettings((settings) => {
       if (settings) {
-        setSiteSettings({ title: settings.siteTitle || GENERIC_APP_NAME, logoUrl: settings.logoUrl || null });
+        setSiteSettings({ title: settings.siteTitle || GENERIC_APP_NAME, logoUrl: settings.logoUrl ?? null });
       }
     });
     return () => unsubscribe();

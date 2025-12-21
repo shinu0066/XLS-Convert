@@ -25,6 +25,8 @@ const ExtractTextFromImageOutputSchema = z.object({
 export type ExtractTextFromImageOutput = z.infer<typeof ExtractTextFromImageOutputSchema>;
 
 export async function extractTextFromImage(input: ExtractTextFromImageInput): Promise<ExtractTextFromImageOutput> {
+  // Note: AbortSignal cannot be passed to server actions in Next.js
+  // Cancellation should be checked on the client side before calling this function
   return extractTextFromImageFlow(input);
 }
 

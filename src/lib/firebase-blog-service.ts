@@ -22,6 +22,8 @@ import {
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { firestore, storage, auth } from './firebase';
 import type { BlogPost, BlogPostStatus } from '@/types/blog';
+import { PermissionError, NotFoundError, isFirebaseSDKError, getUserFriendlyErrorMessage } from '@/types/errors';
+import { logError } from '@/lib/error-handler';
 
 const BLOG_POSTS_COLLECTION = 'blog_posts';
 const BLOG_THUMBNAILS_STORAGE_PATH = 'blog_thumbnails';
@@ -29,18 +31,35 @@ const BLOG_THUMBNAILS_STORAGE_PATH = 'blog_thumbnails';
 // Helper to convert Firestore Timestamps to Dates in a BlogPost object
 const mapDocToBlogPost = (docSnap: DocumentData): BlogPost => {
   const data = docSnap.data() as BlogPost;
+  
+  // Helper to safely convert timestamp to Date
+  const toDate = (value: unknown): Date => {
+    if (value instanceof Timestamp) {
+      return value.toDate();
+    }
+    if (value instanceof Date) {
+      return value;
+    }
+    if (typeof value === 'string' || typeof value === 'number') {
+      return new Date(value);
+    }
+    // Fallback to current date if value is invalid
+    console.warn('Invalid timestamp value, using current date:', value);
+    return new Date();
+  };
+  
   return {
     ...data,
     id: docSnap.id,
-    createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate() : new Date(data.createdAt as any),
-    updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : new Date(data.updatedAt as any),
+    createdAt: toDate(data.createdAt),
+    updatedAt: toDate(data.updatedAt),
   };
 };
 
 export async function createBlogPost(postData: Omit<BlogPost, 'id' | 'createdAt' | 'updatedAt' | 'slug'>, newSlug: string): Promise<string> {
   const currentUser = auth.currentUser;
   if (!currentUser) {
-    throw new Error("Authentication required to create a blog post.");
+    throw new PermissionError("Authentication required to create a blog post.", 'blog_posts', 'create');
   }
   try {
     const docRef = await addDoc(collection(firestore, BLOG_POSTS_COLLECTION), {
@@ -52,7 +71,18 @@ export async function createBlogPost(postData: Omit<BlogPost, 'id' | 'createdAt'
     });
     return docRef.id;
   } catch (error) {
-    console.error("Error creating blog post:", error);
+    logError(error, { 
+      operation: 'createBlogPost', 
+      userId: currentUser.uid,
+      slug: newSlug 
+    });
+    
+    if (isFirebaseSDKError(error)) {
+      if (error.code === 'firestore/permission-denied') {
+        throw new PermissionError("You do not have permission to create blog posts.", 'blog_posts', 'create');
+      }
+    }
+    
     throw error;
   }
 }
@@ -60,47 +90,105 @@ export async function createBlogPost(postData: Omit<BlogPost, 'id' | 'createdAt'
 export async function updateBlogPost(postId: string, postData: Partial<Omit<BlogPost, 'id' | 'createdAt' | 'updatedAt' | 'slug'>>, newSlug?: string): Promise<void> {
   const currentUser = auth.currentUser;
   if (!currentUser) {
-    throw new Error("Authentication required to update a blog post.");
+    throw new PermissionError("Authentication required to update a blog post.", 'blog_posts', 'update');
   }
   try {
     const postRef = doc(firestore, BLOG_POSTS_COLLECTION, postId);
-    const updateData: Partial<BlogPost> = {
+    
+    // Check if post exists
+    const postSnap = await getDoc(postRef);
+    if (!postSnap.exists()) {
+      throw new NotFoundError("Blog post not found.", 'blog_posts', postId);
+    }
+    
+    const updateData = {
       ...postData,
       authorId: currentUser.uid,
       updatedAt: serverTimestamp(),
-    };
+    } as any;
     if (newSlug) {
       updateData.slug = newSlug;
     }
     await updateDoc(postRef, updateData);
   } catch (error) {
-    console.error("Error updating blog post:", error);
+    logError(error, { 
+      operation: 'updateBlogPost', 
+      userId: currentUser.uid,
+      postId 
+    });
+    
+    if (isFirebaseSDKError(error)) {
+      if (error.code === 'firestore/permission-denied') {
+        throw new PermissionError("You do not have permission to update this blog post.", 'blog_posts', 'update');
+      }
+      if (error.code === 'firestore/not-found') {
+        throw new NotFoundError("Blog post not found.", 'blog_posts', postId);
+      }
+    }
+    
     throw error;
   }
 }
 
 export async function deleteBlogPost(postId: string): Promise<void> {
+  const currentUser = auth.currentUser;
   try {
     const postRef = doc(firestore, BLOG_POSTS_COLLECTION, postId);
-    // Optionally, delete associated thumbnail from storage if it exists
+    
+    // Check if post exists
     const postSnap = await getDoc(postRef);
-    if (postSnap.exists()) {
-      const postData = postSnap.data() as BlogPost;
-      if (postData.thumbnailImageUrl) {
-        try {
-          const storageImageRef = ref(storage, postData.thumbnailImageUrl);
-          await deleteObject(storageImageRef);
-        } catch (storageError: any) {
-          // Log error but don't let it block post deletion if image not found
+    if (!postSnap.exists()) {
+      throw new NotFoundError("Blog post not found.", 'blog_posts', postId);
+    }
+    
+    const postData = postSnap.data() as BlogPost;
+    
+    // Delete associated thumbnail from storage if it exists
+    if (postData.thumbnailImageUrl) {
+      try {
+        const storageImageRef = ref(storage, postData.thumbnailImageUrl);
+        await deleteObject(storageImageRef);
+      } catch (storageError: unknown) {
+        // Log error but don't let it block post deletion if image not found
+        if (isFirebaseSDKError(storageError)) {
           if (storageError.code !== 'storage/object-not-found') {
-            console.warn("Error deleting thumbnail image during post deletion:", storageError);
+            logError(storageError, { 
+              operation: 'deleteBlogPostThumbnail', 
+              userId: currentUser?.uid,
+              postId,
+              thumbnailUrl: postData.thumbnailImageUrl 
+            });
+            // Still throw if it's a different error (permission, etc.)
+            throw storageError;
           }
+        } else {
+          logError(storageError, { 
+            operation: 'deleteBlogPostThumbnail', 
+            userId: currentUser?.uid,
+            postId 
+          });
+          throw storageError;
         }
       }
     }
+    
     await deleteDoc(postRef);
   } catch (error) {
-    console.error("Error deleting blog post:", error);
+    logError(error, { 
+      operation: 'deleteBlogPost', 
+      userId: currentUser?.uid,
+      postId 
+    });
+    
+    if (isFirebaseSDKError(error)) {
+      if (error.code === 'firestore/permission-denied') {
+        throw new PermissionError("You do not have permission to delete this blog post.", 'blog_posts', 'delete');
+      }
+      if (error.code === 'firestore/not-found') {
+        throw new NotFoundError("Blog post not found.", 'blog_posts', postId);
+      }
+    }
+    
     throw error;
   }
 }
@@ -146,30 +234,54 @@ export async function getAllBlogPosts(
   startAfterDoc: QueryDocumentSnapshot<DocumentData> | null = null
 ): Promise<PaginatedBlogPosts> {
   try {
-    const baseQueryConstraints = [
-      orderBy('createdAt', 'desc'),
-      limit(postsLimit)
-    ];
+    let querySnapshot;
+    let allFetchedPosts: BlogPost[];
 
-    // For public-facing pages, we now filter *after* fetching to avoid the composite index requirement.
-    // For the admin panel, we fetch all posts regardless of status.
+    // For public-facing pages, try server-side filtering with composite index
+    // For the admin panel, fetch all posts regardless of status
     if (!forAdmin) {
-      // No 'where' clause here to avoid the index error.
-    }
-    
-    if (startAfterDoc) {
-      baseQueryConstraints.push(startAfter(startAfterDoc));
-    }
-    
-    const q = query(collection(firestore, BLOG_POSTS_COLLECTION), ...baseQueryConstraints as any);
-
-    const querySnapshot = await getDocs(q);
-    
-    let allFetchedPosts = querySnapshot.docs.map(mapDocToBlogPost);
-
-    // If it's not for the admin panel, filter out non-published posts now.
-    if (!forAdmin) {
-        allFetchedPosts = allFetchedPosts.filter(post => post.status === 'published');
+      try {
+        // Attempt server-side filtering with composite index
+        // REQUIRED FIREBASE COMPOSITE INDEX:
+        // Collection: blog_posts
+        // Fields: status (Ascending), createdAt (Descending)
+        // Create at: https://console.firebase.google.com/project/_/firestore/indexes
+        const baseQuery = startAfterDoc
+          ? query(
+              collection(firestore, BLOG_POSTS_COLLECTION),
+              where('status', '==', 'published'),
+              orderBy('createdAt', 'desc'),
+              startAfter(startAfterDoc),
+              limit(postsLimit)
+            )
+          : query(
+              collection(firestore, BLOG_POSTS_COLLECTION),
+              where('status', '==', 'published'),
+              orderBy('createdAt', 'desc'),
+              limit(postsLimit)
+            );
+        
+        querySnapshot = await getDocs(baseQuery);
+        allFetchedPosts = querySnapshot.docs.map(mapDocToBlogPost);
+      } catch (indexError: any) {
+        // Fallback to client-side filtering if composite index doesn't exist
+        console.warn('Blog posts composite index not found. Using client-side filtering. Create index: status (Ascending) + createdAt (Descending)', indexError);
+        
+        const fallbackQuery = startAfterDoc
+          ? query(collection(firestore, BLOG_POSTS_COLLECTION), orderBy('createdAt', 'desc'), startAfter(startAfterDoc), limit(postsLimit))
+          : query(collection(firestore, BLOG_POSTS_COLLECTION), orderBy('createdAt', 'desc'), limit(postsLimit));
+        
+        querySnapshot = await getDocs(fallbackQuery);
+        allFetchedPosts = querySnapshot.docs.map(mapDocToBlogPost).filter(post => post.status === 'published');
+      }
+    } else {
+      // Admin panel: fetch all posts
+      const q = startAfterDoc
+        ? query(collection(firestore, BLOG_POSTS_COLLECTION), orderBy('createdAt', 'desc'), startAfter(startAfterDoc), limit(postsLimit))
+        : query(collection(firestore, BLOG_POSTS_COLLECTION), orderBy('createdAt', 'desc'), limit(postsLimit));
+      
+      querySnapshot = await getDocs(q);
+      allFetchedPosts = querySnapshot.docs.map(mapDocToBlogPost);
     }
 
     const lastVisibleDoc = querySnapshot.docs.length > 0 ? querySnapshot.docs[querySnapshot.docs.length - 1] : null;

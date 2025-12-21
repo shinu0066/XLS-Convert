@@ -65,10 +65,10 @@ function CheckoutFlow() {
     }
     
     const initialOptions = {
-        "client-id": PAYPAL_CLIENT_ID,
-        "vault": "true",
-        "intent": "subscription",
-        "currency": "USD",
+      clientId: PAYPAL_CLIENT_ID,
+      vault: true,
+      intent: "subscription" as const,
+      currency: "USD" as const,
     };
 
     const handleSuccessfulSubscription = (subscriptionID: string) => {
@@ -169,7 +169,9 @@ function CheckoutFlow() {
                                 }}
                                 onApprove={(data, actions) => {
                                     toast({ title: 'Processing Subscription...', description: 'Please wait while we finalize your plan.' });
-                                    handleSuccessfulSubscription(data.subscriptionID);
+                                    if (data.subscriptionID) {
+                                      handleSuccessfulSubscription(data.subscriptionID);
+                                    }
                                     // Let the success handler manage the redirect.
                                     return Promise.resolve();
                                 }}

@@ -35,7 +35,7 @@ export function getPayPalClient(): Client {
     }
     
     const environment = process.env.NODE_ENV === 'production' 
-        ? Environment.Live 
+        ? Environment.Production 
         : Environment.Sandbox;
 
     console.log(`[PayPalClient] Initializing PayPal client for ${process.env.NODE_ENV} environment.`);
