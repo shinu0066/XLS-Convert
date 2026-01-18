@@ -111,15 +111,4 @@ export async function uploadPdfAndGetCsv(filename, file) {
 }
 
 
-// Example Usage
-
-// import fs from "fs";
-// import { uploadPdfAndGetCsv } from "./pdfToCsv.js";
-
-// const fileBuffer = fs.readFileSync("doc-statement.pdf");
-
-// const url = await uploadPdfAndGetCsv("doc-statement.pdf", fileBuffer);
-// console.log("CSV URL:", url);
-
-
 
