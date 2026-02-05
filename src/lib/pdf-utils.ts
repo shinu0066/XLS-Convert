@@ -394,7 +394,7 @@ export function formatStructuredDataForExcel(structuredData: any): Array<Array<s
   excelData.push(transactionHeaders);
 
   // Transaction rows - preserve number types for proper Excel formatting
-  const dataRows = transactions.map(t => [
+  const dataRows = transactions.map((t: any) => [
     t.date || '',
     t.description || '',
     t.debit !== undefined && t.debit !== null ? t.debit : null,
