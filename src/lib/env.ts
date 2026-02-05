@@ -25,9 +25,6 @@ export interface FirebaseServiceAccount {
  * Validated environment variables interface
  */
 export interface Env {
-  // AI/Genkit
-  GEMINI_API_KEY: string;
-  
   // PayPal (server-side only)
   PAYPAL_CLIENT_ID: string;
   PAYPAL_CLIENT_SECRET: string;
@@ -96,7 +93,6 @@ function getOptionalEnv(key: string): string | undefined {
  */
 export function getEnv(): Env {
   return {
-    GEMINI_API_KEY: getRequiredEnv('GEMINI_API_KEY'),
     PAYPAL_CLIENT_ID: getRequiredEnv('PAYPAL_CLIENT_ID'),
     PAYPAL_CLIENT_SECRET: getRequiredEnv('PAYPAL_CLIENT_SECRET'),
     FIREBASE_SERVICE_ACCOUNT: parseFirebaseServiceAccount(
@@ -117,7 +113,6 @@ export function getEnvSafe(): Partial<Env> & { NODE_ENV: Env['NODE_ENV'] } {
   const nodeEnv = (getOptionalEnv('NODE_ENV') || 'development') as Env['NODE_ENV'];
   
   return {
-    GEMINI_API_KEY: getOptionalEnv('GEMINI_API_KEY'),
     PAYPAL_CLIENT_ID: getOptionalEnv('PAYPAL_CLIENT_ID'),
     PAYPAL_CLIENT_SECRET: getOptionalEnv('PAYPAL_CLIENT_SECRET'),
     FIREBASE_SERVICE_ACCOUNT: parseFirebaseServiceAccount(

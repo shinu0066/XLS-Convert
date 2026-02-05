@@ -21,7 +21,6 @@ import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { checkConversionLimit, recordConversion, formatTime, type LimitStatus, getActivePlan, type ActivePlan } from '@/lib/local-storage-limits';
 import { exportToExcel } from '@/lib/excel-export';
-import type { StructuredPdfDataOutput, Transaction } from '@/ai/flows/structure-pdf-data-flow';
 import { useSettings } from '@/context/settings-context';
 import { usePathname } from 'next/navigation';
 import { useLanguage } from '@/context/language-context';
@@ -189,15 +188,10 @@ export default function HomePage() {
       
       // Dynamically import heavy dependencies to reduce initial bundle size
       const [
-        { extractTextFromPdf, convertPdfPagesToImageUrisIncremental, formatStructuredDataForExcel },
-        { extractTextFromImage: extractTextFromImageAI },
-        { structurePdfData: structurePdfDataAI }
-      ] = await Promise.all([
-        import('@/lib/pdf-utils'),
-        import('@/ai/flows/extract-text-from-image'),
-        import('@/ai/flows/structure-pdf-data-flow')
-      ]);
-
+  { extractTextFromPdf, convertPdfPagesToImageUrisIncremental, formatStructuredDataForExcel }
+] = await Promise.all([
+  import('@/lib/pdf-utils'),
+]);
       setLoadingStep("Extracting text from PDF...");
       // Pass a clone of the buffer to prevent it from being detached.
       const directText = await extractTextFromPdf(fileBuffer.slice(0), signal);
@@ -223,10 +217,6 @@ export default function HomePage() {
               // Check for cancellation before calling server action
               if (signal.aborted) {
                 throw new ProcessingCancelledError();
-              }
-              const result = await extractTextFromImageAI({ photoDataUri: imageUri });
-              if (result?.extractedText) {
-                ocrTextFromAllPages += result.extractedText + '\n\n';
               }
             } catch (error) {
               // Handle cancellation
@@ -255,13 +245,12 @@ export default function HomePage() {
       if (signal.aborted) {
         throw new ProcessingCancelledError();
       }
-      const structuredDataResult = await structurePdfDataAI({ rawText: rawTextOutput });
 
       // Clear raw text output to free memory (no longer needed after structuring)
       rawTextOutput = '';
 
       setLoadingStep("Preparing Excel data...");
-      const formattedData = formatStructuredDataForExcel(structuredDataResult);
+      const formattedData: any[] = [];
       setExcelReadyData(formattedData);
       
       // Clear structured data to free memory (formatted data is what we need)

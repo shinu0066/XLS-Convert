@@ -3,7 +3,7 @@
  */
 
 import { NextResponse } from 'next/server';
-import type { Response } from 'next/server';
+type Response = globalThis.Response;
 import {
   getErrorMessage,
   getUserFriendlyErrorMessage,
@@ -85,7 +85,7 @@ export function createErrorResponse(
     return NextResponse.json(
       {
         error: userMessage,
-        code: 'code' in error && typeof error.code === 'string' ? error.code : undefined,
+        code: typeof (error as any)?.code === "string" ? (error as any).code : undefined,
       },
       { status: statusCode }
     );

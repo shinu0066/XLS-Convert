@@ -3,7 +3,6 @@
 
 import * as pdfjsLib from 'pdfjs-dist';
 import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist';
-import type { StructuredPdfDataOutput } from '@/ai/flows/structure-pdf-data-flow';
 import { ProcessingCancelledError, NetworkError } from '@/types/errors';
 import { logError } from '@/lib/error-handler';
 
@@ -358,7 +357,7 @@ function validateTransactionData(
  * Formats structured PDF data for Excel export, including headers and footers
  * Returns data with proper types (numbers for numeric fields, strings for text)
  */
-export function formatStructuredDataForExcel(structuredData: StructuredPdfDataOutput | null): Array<Array<string | number | null>> {
+export function formatStructuredDataForExcel(structuredData: any): Array<Array<string | number | null>> {
   if (!structuredData || !structuredData.transactions || structuredData.transactions.length === 0) {
     return [["No financial transaction data could be extracted from the document."]];
   }
