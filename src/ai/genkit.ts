@@ -1,2 +1,3 @@
-// Gemini disabled
-export const ai = null;
+// src/lib/genkit.ts
+// Gemini intentionally disabled
+export {};
