@@ -2,17 +2,14 @@
  * Error handling utilities for consistent error responses and logging
  */
 
-import { NextResponse } from 'next/server';
-import type { Response } from 'next/server';
+import { NextResponse, type NextResponse as NextResponseType } from "next/server";
 import {
-  getErrorMessage,
   getUserFriendlyErrorMessage,
   getErrorStatusCode,
   getErrorContext,
   isRetryableError,
   isProcessingCancelledError,
-  type AppError,
-} from '@/types/errors';
+} from "@/types/errors";
 
 /**
  * Error context for logging
@@ -28,10 +25,7 @@ export interface ErrorLogContext {
 /**
  * Logs error with context
  */
-export function logError(
-  error: unknown,
-  context?: ErrorLogContext
-): void {
+export function logError(error: unknown, context?: ErrorLogContext): void {
   const errorContext = getErrorContext(error);
   const logData = {
     ...errorContext,
@@ -40,16 +34,12 @@ export function logError(
     environment: process.env.NODE_ENV,
   };
 
-  // In production, you might want to send this to an error tracking service
-  // For now, we'll use console.error with structured data
-  if (process.env.NODE_ENV === 'production') {
-    // In production, log as JSON for better parsing
-    console.error('[ERROR]', JSON.stringify(logData));
+  if (process.env.NODE_ENV === "production") {
+    console.error("[ERROR]", JSON.stringify(logData));
   } else {
-    // In development, log with more detail
-    console.error('[ERROR]', logData);
+    console.error("[ERROR]", logData);
     if (error instanceof Error && error.stack) {
-      console.error('[STACK]', error.stack);
+      console.error("[STACK]", error.stack);
     }
   }
 }
@@ -60,12 +50,11 @@ export function logError(
 export function createErrorResponse(
   error: unknown,
   context?: ErrorLogContext
-): Response {
+): NextResponseType {
   // Log the error
   logError(error, context);
 
-  // Don't expose internal errors in production
-  const isProduction = process.env.NODE_ENV === 'production';
+  const isProduction = process.env.NODE_ENV === "production";
   const statusCode = getErrorStatusCode(error);
   const userMessage = getUserFriendlyErrorMessage(error);
 
@@ -73,7 +62,7 @@ export function createErrorResponse(
   if (isProcessingCancelledError(error)) {
     return NextResponse.json(
       {
-        error: 'Processing was cancelled',
+        error: "Processing was cancelled",
         message: userMessage,
       },
       { status: 499 } // Client Closed Request
@@ -82,10 +71,18 @@ export function createErrorResponse(
 
   // For client errors (4xx), include more detail
   if (statusCode >= 400 && statusCode < 500) {
+    const code =
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      typeof (error as any).code === "string"
+        ? (error as any).code
+        : undefined;
+
     return NextResponse.json(
       {
         error: userMessage,
-        code: 'code' in error && typeof error.code === 'string' ? error.code : undefined,
+        code,
       },
       { status: statusCode }
     );
@@ -95,7 +92,7 @@ export function createErrorResponse(
   return NextResponse.json(
     {
       error: isProduction
-        ? 'An internal server error occurred. Please try again later.'
+        ? "An internal server error occurred. Please try again later."
         : userMessage,
       ...(isProduction ? {} : { details: getErrorContext(error) }),
     },
@@ -106,10 +103,9 @@ export function createErrorResponse(
 /**
  * Wraps an async API route handler with error handling
  */
-export function withErrorHandler<T extends (...args: any[]) => Promise<Response>>(
-  handler: T,
-  context?: ErrorLogContext
-): T {
+export function withErrorHandler<
+  T extends (...args: any[]) => Promise<NextResponseType>
+>(handler: T, context?: ErrorLogContext): T {
   return (async (...args: Parameters<T>) => {
     try {
       return await handler(...args);
@@ -144,17 +140,16 @@ export async function handleAsyncError<T>(
 
       // Don't retry if error is not retryable
       if (!isRetryableError(error) || attempt > retries) {
-        if (onError) {
-          onError(error, attempt);
-        } else {
-          logError(error, { ...context, attempt });
-        }
+        if (onError) onError(error, attempt);
+        else logError(error, { ...context, attempt });
         throw error;
       }
 
       // Wait before retrying
       if (attempt <= retries) {
-        await new Promise((resolve) => setTimeout(resolve, retryDelay * attempt));
+        await new Promise((resolve) =>
+          setTimeout(resolve, retryDelay * attempt)
+        );
       }
     }
   }
@@ -169,7 +164,10 @@ export async function handleAsyncError<T>(
 export async function safeExecute<T>(
   fn: () => Promise<T>,
   context?: ErrorLogContext
-): Promise<{ success: true; data: T } | { success: false; error: unknown; message: string }> {
+): Promise<
+  | { success: true; data: T }
+  | { success: false; error: unknown; message: string }
+> {
   try {
     const data = await fn();
     return { success: true, data };
@@ -193,8 +191,9 @@ export function validateOrThrow(
   value?: unknown
 ): asserts condition {
   if (!condition) {
-    const { ValidationError } = require('@/types/errors');
+    // Keeping require() because this function can be used in places where circular imports may happen
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { ValidationError } = require("@/types/errors");
     throw new ValidationError(message, field, value);
   }
 }
-
