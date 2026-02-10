@@ -47,7 +47,7 @@ export default function FileUploader({
     maxFiles: isSubscribed ? MAX_FILES_LOGGED_IN : 1,
     multiple: isSubscribed,
     disabled,
-    noClick: true, // ✅ button se open() hoga (card click se nahi)
+    noClick: true,
   });
 
   const handleButtonClick = useCallback(
@@ -55,7 +55,6 @@ export default function FileUploader({
       e.stopPropagation();
       e.preventDefault();
 
-      // reset so same file can be picked again
       if (inputRef.current) {
         inputRef.current.value = "";
       }
@@ -71,8 +70,8 @@ export default function FileUploader({
       : dragText;
   }, [isSubscribed, dragText]);
 
-  // ✅ IMPORTANT: remove `ref` from input props (fixes TS error on Vercel)
-  const { ref: _dropzoneRef, ...inputProps } = getInputProps();
+  // ✅ IMPORTANT: remove `ref` from input props (TS typing doesn't include it, so cast to any)
+  const { ref: _dropzoneRef, ...inputProps } = (getInputProps() as any);
 
   return (
     <Card
@@ -82,7 +81,6 @@ export default function FileUploader({
                   ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
     >
       <CardContent className="p-10 flex flex-col items-center justify-center text-center min-h-[200px]">
-        {/* ✅ Use our own ref only */}
         <input {...inputProps} ref={inputRef} />
 
         <UploadCloud
