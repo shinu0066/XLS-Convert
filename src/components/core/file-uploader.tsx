@@ -73,14 +73,16 @@ export default function FileUploader({
         <input 
           {...inputProps} 
           ref={(node) => {
-            inputRef.current = node;
-            // Merge refs if inputProps has a ref
-            if (typeof inputProps.ref === 'function') {
-              inputProps.ref(node);
-            } else if (inputProps.ref) {
-              (inputProps.ref as React.MutableRefObject<HTMLInputElement | null>).current = node;
-            }
-          }}
+  // Merge refs properly
+  if (inputRef) {
+    (inputRef as React.MutableRefObject<HTMLInputElement | null>).current = node;
+  }
+  if (typeof inputProps.ref === 'function') {
+    inputProps.ref(node);
+  } else if (inputProps.ref) {
+    (inputProps.ref as React.MutableRefObject<HTMLInputElement | null>).current = node;
+  }
+}}
         />
         <UploadCloud className={`h-12 w-12 mb-4 ${isDragActive ? 'text-primary' : 'text-muted-foreground'}`} />
         {isDragActive ? (
