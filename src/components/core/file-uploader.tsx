@@ -25,7 +25,7 @@ export default function FileUploader({
   orText = "or",
   clickText = "Click to select file"
 }: FileUploaderProps) {
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
   
   const onDrop = useCallback((acceptedFiles: FileWithPath[]) => {
     if (acceptedFiles && acceptedFiles.length > 0) {
@@ -37,13 +37,15 @@ export default function FileUploader({
     }
   }, [onFilesSelect]);
 
-  const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
-    onDrop,
-    accept: { 'application/pdf': ['.pdf'] },
-    maxFiles: isSubscribed ? MAX_FILES_LOGGED_IN : 1,
-    multiple: isSubscribed,
-    disabled,
-  });
+const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
+  onDrop,
+  accept: { 'application/pdf': ['.pdf'] },
+  maxFiles: isSubscribed ? MAX_FILES_LOGGED_IN : 1,
+  multiple: isSubscribed,
+  disabled,
+  inputRef, // ✅ add this line
+});
+
 
   const handleButtonClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
@@ -58,23 +60,7 @@ export default function FileUploader({
     ? dragText.replace('a PDF file', `up to ${MAX_FILES_LOGGED_IN} PDF files`)
     : dragText;
 
-  const inputProps = getInputProps();
-  
-  // Merge refs callback
-  const mergeRefs = useCallback((node: HTMLInputElement | null) => {
-    // Assign to our ref
-    if (inputRef) {
-      (inputRef as any).current = node;
-    }
-    // Call the dropzone ref if it's a function
-    if (typeof inputProps.ref === 'function') {
-      inputProps.ref(node);
-    } 
-    // Or assign to dropzone ref object
-    else if (inputProps.ref) {
-      (inputProps.ref as any).current = node;
-    }
-  }, [inputProps.ref]);
+
 
   return (
     <Card 
@@ -84,10 +70,8 @@ export default function FileUploader({
                   ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
     >
       <CardContent className="p-10 flex flex-col items-center justify-center text-center min-h-[200px]">
-        <input 
-          {...inputProps} 
-          ref={mergeRefs}
-        />
+       <input {...getInputProps()} />
+
         <UploadCloud className={`h-12 w-12 mb-4 ${isDragActive ? 'text-primary' : 'text-muted-foreground'}`} />
         {isDragActive ? (
           <p className="text-lg font-semibold text-primary">{uploaderText.replace('&', 'and')}...</p>
