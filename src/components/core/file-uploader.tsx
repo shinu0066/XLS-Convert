@@ -47,7 +47,7 @@ export default function FileUploader({
     maxFiles: isSubscribed ? MAX_FILES_LOGGED_IN : 1,
     multiple: isSubscribed,
     disabled,
-    // NOTE: do NOT add inputRef here (your react-dropzone typings don't support it)
+    noClick: true, // ✅ button se open() hoga (card click se nahi)
   });
 
   const handleButtonClick = useCallback(
@@ -71,26 +71,8 @@ export default function FileUploader({
       : dragText;
   }, [isSubscribed, dragText]);
 
-  // We need to merge our own ref with dropzone's internal ref (type-safe)
-  const inputProps = getInputProps();
-
-  const mergedInputRef = useCallback(
-    (node: HTMLInputElement | null) => {
-      // our writable ref
-      inputRef.current = node;
-
-      // dropzone ref can be function or object
-      const dzRef = inputProps.ref as unknown as
-        | ((instance: HTMLInputElement | null) => void)
-        | React.MutableRefObject<HTMLInputElement | null>
-        | null
-        | undefined;
-
-      if (typeof dzRef === "function") dzRef(node);
-      else if (dzRef && "current" in dzRef) dzRef.current = node;
-    },
-    [inputProps.ref]
-  );
+  // ✅ IMPORTANT: remove `ref` from input props (fixes TS error on Vercel)
+  const { ref: _dropzoneRef, ...inputProps } = getInputProps();
 
   return (
     <Card
@@ -100,7 +82,8 @@ export default function FileUploader({
                   ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
     >
       <CardContent className="p-10 flex flex-col items-center justify-center text-center min-h-[200px]">
-        <input {...inputProps} ref={mergedInputRef} />
+        {/* ✅ Use our own ref only */}
+        <input {...inputProps} ref={inputRef} />
 
         <UploadCloud
           className={`h-12 w-12 mb-4 ${
