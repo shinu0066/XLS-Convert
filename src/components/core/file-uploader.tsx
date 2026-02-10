@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useCallback, useRef } from 'react';
@@ -47,9 +46,8 @@ export default function FileUploader({
   });
 
   const handleButtonClick = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent event bubbling to root
-    e.preventDefault(); // Prevent any default behavior
-    // Reset input value to allow selecting the same file again
+    e.stopPropagation();
+    e.preventDefault();
     if (inputRef.current) {
       inputRef.current.value = '';
     }
@@ -62,6 +60,22 @@ export default function FileUploader({
 
   const inputProps = getInputProps();
   
+  // Merge refs callback
+  const mergeRefs = useCallback((node: HTMLInputElement | null) => {
+    // Assign to our ref
+    if (inputRef) {
+      (inputRef as any).current = node;
+    }
+    // Call the dropzone ref if it's a function
+    if (typeof inputProps.ref === 'function') {
+      inputProps.ref(node);
+    } 
+    // Or assign to dropzone ref object
+    else if (inputProps.ref) {
+      (inputProps.ref as any).current = node;
+    }
+  }, [inputProps.ref]);
+
   return (
     <Card 
       {...getRootProps()} 
@@ -72,17 +86,7 @@ export default function FileUploader({
       <CardContent className="p-10 flex flex-col items-center justify-center text-center min-h-[200px]">
         <input 
           {...inputProps} 
-          ref={(node) => {
-  // Merge refs properly
-  if (inputRef) {
-    (inputRef as React.MutableRefObject<HTMLInputElement | null>).current = node;
-  }
-  if (typeof inputProps.ref === 'function') {
-    inputProps.ref(node);
-  } else if (inputProps.ref) {
-    (inputProps.ref as React.MutableRefObject<HTMLInputElement | null>).current = node;
-  }
-}}
+          ref={mergeRefs}
         />
         <UploadCloud className={`h-12 w-12 mb-4 ${isDragActive ? 'text-primary' : 'text-muted-foreground'}`} />
         {isDragActive ? (
