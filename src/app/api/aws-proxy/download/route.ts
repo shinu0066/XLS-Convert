@@ -22,16 +22,29 @@ export async function POST(request: NextRequest) {
       }),
     });
 
+    const responseText = await response.text();
+    let data: { status?: string; downloadUrl?: string; message?: string };
+    try {
+      data = responseText ? JSON.parse(responseText) : {};
+    } catch {
+      data = {};
+    }
+
+    // Lambda returns 404 when CSV is not ready yet (NOT_FOUND). Client expects 200 + body.status
+    // so it can keep polling. Forward as 200 with the same body instead of 404.
+    if (response.status === 404 && data.status === 'NOT_FOUND') {
+      console.log('📦 Status: NOT_FOUND (still processing)');
+      return NextResponse.json(data);
+    }
+
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error('❌ AWS Lambda error:', errorText);
+      console.error('❌ AWS Lambda error:', response.status, responseText);
       return NextResponse.json(
-        { error: 'Failed to get download URL' },
+        { error: 'Failed to get download URL', ...data },
         { status: response.status }
       );
     }
 
-    const data = await response.json();
     console.log('📦 Status:', data.status);
     return NextResponse.json(data);
   } catch (error) {
