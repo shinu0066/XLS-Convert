@@ -70,8 +70,16 @@ export default function FileUploader({
       : dragText;
   }, [isSubscribed, dragText]);
 
-  // ✅ IMPORTANT: remove `ref` from input props (TS typing doesn't include it, so cast to any)
-  const { ref: _dropzoneRef, ...inputProps } = (getInputProps() as any);
+  // Keep dropzone's ref so open() can click the input; merge with inputRef for clearing in onDrop
+  const { ref: dropzoneInputRef, ...inputProps } = (getInputProps() as { ref: React.RefCallback<HTMLInputElement>; [k: string]: unknown });
+
+  const setInputRef = useCallback(
+    (el: HTMLInputElement | null) => {
+      (dropzoneInputRef as React.RefCallback<HTMLInputElement>)(el);
+      inputRef.current = el;
+    },
+    [dropzoneInputRef]
+  );
 
   return (
     <Card
@@ -81,7 +89,7 @@ export default function FileUploader({
                   ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
     >
       <CardContent className="p-10 flex flex-col items-center justify-center text-center min-h-[200px]">
-        <input {...inputProps} ref={inputRef} />
+        <input {...inputProps} ref={setInputRef} />
 
         <UploadCloud
           className={`h-12 w-12 mb-4 ${
