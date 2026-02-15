@@ -71,11 +71,19 @@ export default function FileUploader({
   }, [isSubscribed, dragText]);
 
   // Keep dropzone's ref so open() can click the input; merge with inputRef for clearing in onDrop
-  const { ref: dropzoneInputRef, ...inputProps } = (getInputProps() as { ref: React.RefCallback<HTMLInputElement>; [k: string]: unknown });
+  const inputPropsFromDropzone = getInputProps();
+  const dropzoneInputRef = (inputPropsFromDropzone as { ref?: React.Ref<HTMLInputElement>; [k: string]: unknown }).ref;
+  const { ref: _ref, ...inputProps } = inputPropsFromDropzone as { ref?: React.Ref<HTMLInputElement>; [k: string]: unknown };
 
   const setInputRef = useCallback(
     (el: HTMLInputElement | null) => {
-      (dropzoneInputRef as React.RefCallback<HTMLInputElement>)(el);
+      if (dropzoneInputRef) {
+        if (typeof dropzoneInputRef === "function") {
+          dropzoneInputRef(el);
+        } else if ("current" in dropzoneInputRef) {
+          (dropzoneInputRef as React.MutableRefObject<HTMLInputElement | null>).current = el;
+        }
+      }
       inputRef.current = el;
     },
     [dropzoneInputRef]
