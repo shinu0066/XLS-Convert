@@ -101,6 +101,14 @@ export async function uploadPdfAndGetCsv(
         throw new Error(data.message || 'Processing failed');
       }
 
+      // NOT_FOUND or PROCESSING: CSV not ready yet, keep polling
+      if (data.status === 'NOT_FOUND') {
+        console.log(`⏳ CSV not ready yet (attempt ${attempt}/${MAX_RETRIES})`);
+      }
+      onProgress?.(
+        `Waiting for conversion… (${attempt}/${MAX_RETRIES}, ~${RETRY_DELAY_MS / 1000}s between checks)`
+      );
+
       if (attempt < MAX_RETRIES) {
         await sleep(RETRY_DELAY_MS);
       }
