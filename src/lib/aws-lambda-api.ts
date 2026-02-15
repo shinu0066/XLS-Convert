@@ -22,6 +22,14 @@ const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 const pdfKeyToCsv = (key: string) =>
   key.replace(/^uploads\//, 'processed/').replace(/\.pdf$/i, '.csv');
 
+/** Sanitize filename for S3 key: no spaces or special chars (avoids Lambda/S3 quirks). */
+function sanitizeFilenameForS3(name: string): string {
+  const base = name.replace(/\.[^/.]+$/, '') || 'document';
+  const ext = name.includes('.') ? name.slice(name.lastIndexOf('.')) : '.pdf';
+  const safe = base.replace(/\s+|\(|\)|\[|\]|#|%|&|\?|[*]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+  return (safe || 'document') + (ext.toLowerCase().endsWith('.pdf') ? ext : '.pdf');
+}
+
 // Convert File to base64
 async function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -42,12 +50,13 @@ export async function uploadPdfAndGetCsv(
   console.log('🚀 Starting PDF upload...');
   
   try {
-    // Step 1: Get upload URL via proxy
+    // Step 1: Get upload URL via proxy (sanitized filename for reliable S3/Lambda behavior)
     onProgress?.('Getting upload URL...');
+    const safeFilename = sanitizeFilenameForS3(file.name);
     const uploadResponse = await fetch('/api/aws-proxy/upload', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ filename: file.name }),
+      body: JSON.stringify({ filename: safeFilename }),
     });
 
     if (!uploadResponse.ok) {
