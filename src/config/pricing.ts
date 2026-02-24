@@ -34,7 +34,6 @@ export const PRICING_PLANS: Plan[] = [
     annualPrice: 90, // $7.5/month effectively
     monthlyConversions: 400,
     annualConversions: 4800,
-    trialDays: 7,
     monthlyPlanId: 'P-3UN42152FX9222143NBZ4XIA', 
     annualPlanId: 'P-3UN42152FX9222143NBZ4XIA', // Using same ID for demo
     features: [
@@ -54,7 +53,6 @@ export const PRICING_PLANS: Plan[] = [
     annualPrice: 180, // $15/month effectively
     monthlyConversions: 1000,
     annualConversions: 12000,
-    trialDays: 7,
     monthlyPlanId: 'P-3UN42152FX9222143NBZ4XIA', // Using same ID for demo
     annualPlanId: 'P-3UN42152FX9222143NBZ4XIA', // Using same ID for demo
     features: [
@@ -75,7 +73,6 @@ export const PRICING_PLANS: Plan[] = [
     annualPrice: 300, // $25/month effectively
     monthlyConversions: 4000,
     annualConversions: 48000,
-    trialDays: 7,
     monthlyPlanId: 'P-3UN42152FX9222143NBZ4XIA', // Using same ID for demo
     annualPlanId: 'P-3UN42152FX9222143NBZ4XIA', // Using same ID for demo
     features: [
