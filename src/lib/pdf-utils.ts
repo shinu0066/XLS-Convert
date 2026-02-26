@@ -20,6 +20,29 @@ if (typeof window !== 'undefined' && !workerInitialized) {
 }
 
 /**
+ * Returns the number of pages in a PDF (lightweight: only loads document metadata).
+ * @param pdfBuffer The ArrayBuffer of the PDF file.
+ * @returns Promise resolving to the page count, or null if the PDF could not be read.
+ */
+export async function getPdfPageCount(pdfBuffer: ArrayBuffer): Promise<number | null> {
+  let pdf: PDFDocumentProxy | null = null;
+  try {
+    pdf = await pdfjsLib.getDocument({ data: pdfBuffer }).promise;
+    return pdf.numPages;
+  } catch {
+    return null;
+  } finally {
+    if (pdf) {
+      try {
+        pdf.destroy();
+      } catch {
+        // ignore
+      }
+    }
+  }
+}
+
+/**
  * Extracts raw text from a PDF ArrayBuffer.
  * @param pdfBuffer The ArrayBuffer of the PDF file.
  * @param signal Optional AbortSignal to cancel the operation.
