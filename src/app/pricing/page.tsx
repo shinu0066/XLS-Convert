@@ -95,7 +95,6 @@ export default function PricingPage() {
         </h1>
         <p className="mt-4 max-w-2xl mx-auto text-xl text-muted-foreground">
           Choose the plan that best suits your PDF to Excel conversion needs. Get more with annual billing!
-          All paid plans include an initial 7-day trial period.
         </p>
       </div>
 
@@ -139,10 +138,6 @@ export default function PricingPage() {
       <div className="mt-16 p-8 bg-card rounded-lg shadow-md">
         <h3 className="text-2xl font-semibold text-center text-primary mb-6">Frequently Asked Questions</h3>
         <div className="space-y-4">
-          <div>
-            <h4 className="font-medium text-foreground">How does the 7-day trial period work with paid plans?</h4>
-            <p className="text-muted-foreground">When you purchase a plan, the first 7 days are considered a trial period. You get full access to the plan's features and conversion limits. If you're not satisfied, you can request a refund within these 7 days (subject to terms). The payment covers the entire first billing cycle (month or year).</p>
-          </div>
           <div>
             <h4 className="font-medium text-foreground">Can I change my plan later?</h4>
             <p className="text-muted-foreground">Yes, you can upgrade or downgrade your plan. Changes will typically apply from the next billing cycle. Please <Link href="/contact" className="text-primary underline">contact us</Link> for assistance.</p>
