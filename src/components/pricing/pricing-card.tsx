@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import type { Plan, PlanFeature } from '@/config/pricing';
-import { CheckCircle2, XCircle, Clock } from 'lucide-react';
+import { CheckCircle2, XCircle } from 'lucide-react';
 
 interface PricingCardProps {
   plan: Plan;
@@ -31,7 +31,7 @@ export default function PricingCard({ plan, billingCycle, currentUser }: Pricing
     }
   };
 
-  const ctaButtonText = currentUser ? (plan.trialDays ? `Start ${plan.trialDays}-Day Trial` : "Get Started") : "Sign In to Purchase";
+  const ctaButtonText = currentUser ? "Get Started" : "Sign In to Purchase";
 
   return (
     <Card className={cn(
@@ -53,12 +53,6 @@ export default function PricingCard({ plan, billingCycle, currentUser }: Pricing
           <span className="text-4xl font-extrabold text-foreground">${displayPrice}</span>
           <span className="text-sm text-muted-foreground">/{cycleAdverb}</span>
         </div>
-        {plan.trialDays && plan.trialDays > 0 && (
-          <div className="text-center text-sm font-medium text-accent-foreground bg-accent/80 p-2 rounded-md flex items-center justify-center gap-2">
-            <Clock className="h-4 w-4" />
-            Includes {plan.trialDays}-Day Trial Period
-          </div>
-        )}
         <ul className="space-y-3">
           <li className="flex items-start">
             <CheckCircle2 className="h-5 w-5 text-green-500 mr-2 mt-0.5 shrink-0" />
