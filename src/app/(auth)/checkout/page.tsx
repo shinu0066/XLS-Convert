@@ -14,9 +14,8 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { CheckCircle, Package, Terminal } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 
-// Hardcoded PayPal Client ID to bypass Firebase settings issues.
-const PAYPAL_CLIENT_ID = "AZTt9MVK63m_kcmv3r43nZKDotUbgcrz8y4g3dnAJn5FhPsQ9bV5sbYcUfWaELDF1Ij7jYjPaZLhpO-o";
-
+// Browser PayPal buttons require NEXT_PUBLIC_PAYPAL_CLIENT_ID in env for checkout to work.
+const PAYPAL_CLIENT_ID = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID ?? "";
 
 function CheckoutFlow() {
     const router = useRouter();
@@ -127,12 +126,6 @@ function CheckoutFlow() {
                                 <CheckCircle className="h-5 w-5 text-green-500"/>
                                 <span>Advanced AI Structuring</span>
                             </li>
-                             {plan.trialDays ? (
-                                <li className="flex items-center gap-2">
-                                    <CheckCircle className="h-5 w-5 text-green-500"/>
-                                    <span>{plan.trialDays}-Day Free Trial Included</span>
-                                </li>
-                             ) : null}
                         </ul>
                          <Separator />
                          <div className="flex justify-between items-center text-lg">
