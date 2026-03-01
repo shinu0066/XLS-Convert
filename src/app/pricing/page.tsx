@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import PricingCard from '@/components/pricing/pricing-card';
-import { PRICING_PLANS, type Plan as PlanType } from '@/config/pricing';
+import { PRICING_PLANS, ANNUAL_BILLING_ENABLED, type Plan as PlanType } from '@/config/pricing';
 import { useAuth } from '@/hooks/use-auth';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
@@ -94,10 +94,12 @@ export default function PricingPage() {
           Find the Perfect Plan
         </h1>
         <p className="mt-4 max-w-2xl mx-auto text-xl text-muted-foreground">
-          Choose the plan that best suits your PDF to Excel conversion needs. Get more with annual billing!
+          Choose the plan that best suits your PDF to Excel conversion needs.
+          {ANNUAL_BILLING_ENABLED ? ' Get more with annual billing!' : ''}
         </p>
       </div>
 
+      {ANNUAL_BILLING_ENABLED ? (
       <div className="flex justify-center mb-10">
         <Tabs value={billingCycle} onValueChange={(value) => setBillingCycle(value as 'monthly' | 'annual')} className="w-auto">
           <TabsList className="grid w-full grid-cols-2 md:w-auto">
@@ -106,13 +108,14 @@ export default function PricingPage() {
           </TabsList>
         </Tabs>
       </div>
+      ) : null}
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 items-stretch justify-center">
         {PRICING_PLANS.map((plan) => (
           <PricingCard
             key={plan.id}
             plan={plan}
-            billingCycle={billingCycle}
+            billingCycle={ANNUAL_BILLING_ENABLED ? billingCycle : 'monthly'}
             currentUser={currentUser}
           />
         ))}
