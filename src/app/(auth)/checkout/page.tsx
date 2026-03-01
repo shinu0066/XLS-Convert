@@ -6,7 +6,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { PayPalScriptProvider, PayPalButtons } from "@paypal/react-paypal-js";
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
-import { PRICING_PLANS, type Plan as PlanType } from '@/config/pricing';
+import { PRICING_PLANS, ANNUAL_BILLING_ENABLED, type Plan as PlanType } from '@/config/pricing';
 import { activatePlan, type PlanDetails } from '@/lib/local-storage-limits';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import LoadingSpinner from '@/components/core/loading-spinner';
@@ -27,6 +27,7 @@ function CheckoutFlow() {
 
     const planId = searchParams.get('planId') as PlanType['id'];
     const cycle = searchParams.get('cycle') as 'monthly' | 'annual';
+    const effectiveCycle = (ANNUAL_BILLING_ENABLED && cycle === 'annual') ? 'annual' : 'monthly';
     const plan = PRICING_PLANS.find(p => p.id === planId);
     
     useEffect(() => {
@@ -35,19 +36,22 @@ function CheckoutFlow() {
             toast({ variant: 'destructive', title: 'Invalid Plan', description: 'No plan selected. Redirecting to pricing.' });
             router.push('/pricing');
         }
+        if (!ANNUAL_BILLING_ENABLED && cycle === 'annual' && planId) {
+            router.replace(`/checkout?planId=${planId}&cycle=monthly`);
+        }
         if (!currentUser) {
             toast({ variant: 'destructive', title: 'Not Logged In', description: 'You must be logged in to check out.' });
             router.push('/login');
         }
-    }, [plan, cycle, router, toast, currentUser]);
+    }, [plan, cycle, planId, router, toast, currentUser]);
 
     if (isLoading || !plan || !cycle || !currentUser) {
         return <div className="flex h-64 items-center justify-center"><LoadingSpinner message="Loading checkout..." /></div>;
     }
 
-    const price = cycle === 'monthly' ? plan.monthlyPrice : plan.annualPrice;
-    const paypalPlanId = cycle === 'monthly' ? plan.monthlyPlanId : plan.annualPlanId;
-    const conversions = cycle === 'monthly' ? plan.monthlyConversions : plan.annualConversions;
+    const price = effectiveCycle === 'monthly' ? plan.monthlyPrice : plan.annualPrice;
+    const paypalPlanId = effectiveCycle === 'monthly' ? plan.monthlyPlanId : plan.annualPlanId;
+    const conversions = effectiveCycle === 'monthly' ? plan.monthlyConversions : plan.annualConversions;
     
     if (!PAYPAL_CLIENT_ID || !paypalPlanId || paypalPlanId.startsWith('REPLACE_')) {
         return (
@@ -74,8 +78,8 @@ function CheckoutFlow() {
          const planDetailsToActivate: PlanDetails = {
             id: plan.id,
             name: plan.name,
-            conversions: cycle === 'monthly' ? plan.monthlyConversions : plan.annualConversions,
-            cycle: cycle,
+            conversions: effectiveCycle === 'monthly' ? plan.monthlyConversions : plan.annualConversions,
+            cycle: effectiveCycle,
             price: price,
             trialDays: plan.trialDays,
         };
@@ -91,7 +95,7 @@ function CheckoutFlow() {
         // Redirect to the new invoice page
         const queryParams = new URLSearchParams({
             planName: plan.name,
-            cycle: cycle,
+            cycle: effectiveCycle,
             price: price.toString(),
             subscriptionId: subscriptionID,
             date: new Date().toISOString(),
@@ -111,7 +115,7 @@ function CheckoutFlow() {
                             <Package className="h-8 w-8 text-accent"/>
                             <div className="flex flex-col">
                                 <span className="text-2xl">{plan.name} Plan</span>
-                                <span className="text-sm font-normal text-muted-foreground capitalize">{cycle} Subscription</span>
+                                <span className="text-sm font-normal text-muted-foreground capitalize">{effectiveCycle} Subscription</span>
                             </div>
                         </CardTitle>
                     </CardHeader>
@@ -120,7 +124,7 @@ function CheckoutFlow() {
                         <ul className="space-y-3 text-muted-foreground">
                             <li className="flex items-center gap-2">
                                 <CheckCircle className="h-5 w-5 text-green-500"/>
-                                <span>{conversions.toLocaleString()} conversions / {cycle === 'monthly' ? 'month' : 'year'}</span>
+                                <span>{conversions.toLocaleString()} conversions / {effectiveCycle === 'monthly' ? 'month' : 'year'}</span>
                             </li>
                             <li className="flex items-center gap-2">
                                 <CheckCircle className="h-5 w-5 text-green-500"/>
