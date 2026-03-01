@@ -2,6 +2,9 @@
 import type React from 'react';
 import { Package, Zap, Briefcase, CheckCircle2 } from 'lucide-react';
 
+/** Set to true to re-enable annual billing (e.g. after 3 months). */
+export const ANNUAL_BILLING_ENABLED = false;
+
 export interface PlanFeature {
   text: string;
   icon?: React.ElementType;
@@ -30,8 +33,8 @@ export const PRICING_PLANS: Plan[] = [
     id: 'starter',
     name: 'Starter',
     icon: Package,
-    monthlyPrice: 15,
-    annualPrice: 90, // $7.5/month effectively
+    monthlyPrice: 29.99,
+    annualPrice: 299.99, // ~$25/month when billed annually
     monthlyConversions: 400,
     annualConversions: 4800,
     monthlyPlanId: 'P-3UN42152FX9222143NBZ4XIA', 
@@ -49,8 +52,8 @@ export const PRICING_PLANS: Plan[] = [
     id: 'professional',
     name: 'Professional',
     icon: Zap,
-    monthlyPrice: 30,
-    annualPrice: 180, // $15/month effectively
+    monthlyPrice: 59.99,
+    annualPrice: 599.99, // ~$50/month when billed annually
     monthlyConversions: 1000,
     annualConversions: 12000,
     monthlyPlanId: 'P-3UN42152FX9222143NBZ4XIA', // Using same ID for demo
@@ -69,8 +72,8 @@ export const PRICING_PLANS: Plan[] = [
     id: 'business',
     name: 'Business',
     icon: Briefcase,
-    monthlyPrice: 50,
-    annualPrice: 300, // $25/month effectively
+    monthlyPrice: 149.99,
+    annualPrice: 1499.99, // ~$125/month when billed annually
     monthlyConversions: 4000,
     annualConversions: 48000,
     monthlyPlanId: 'P-3UN42152FX9222143NBZ4XIA', // Using same ID for demo
