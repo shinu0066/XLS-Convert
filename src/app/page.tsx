@@ -1,13 +1,18 @@
 "use client";
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import FileUploader from '@/components/core/file-uploader';
+import LimitDialog from '@/components/core/limit-dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Download, Trash2, Zap, FileText, Terminal } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/use-auth';
 import { uploadPdfAndGetCsv, triggerDownload } from '@/lib/aws-lambda-api';
+import { checkConversionLimit, recordConversion, formatTime, getActivePlan, type ActivePlan } from '@/lib/local-storage-limits';
+import { getPdfPageCount } from '@/lib/pdf-utils';
+import { addToDownloadHistory } from '@/lib/download-history-storage';
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
@@ -17,8 +22,27 @@ export default function HomePage() {
   const [isLoading, setIsLoading] = useState(false);
   const [loadingStep, setLoadingStep] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
-  
+  const [showLimitDialog, setShowLimitDialog] = useState(false);
+  const [limitDialogContent, setLimitDialogContent] = useState<{
+    userType: 'guest' | 'loggedIn';
+    timeToWaitFormatted?: string;
+    onPlan?: boolean;
+    planName?: string;
+    isPlanExhausted?: boolean;
+  }>({ userType: 'guest' });
+  const [activePlan, setActivePlan] = useState<ActivePlan | null>(null);
+  const [pdfPageCount, setPdfPageCount] = useState<number | null>(null);
+
   const { toast } = useToast();
+  const { currentUser } = useAuth();
+
+  useEffect(() => {
+    if (currentUser) {
+      setActivePlan(getActivePlan(currentUser.uid));
+    } else {
+      setActivePlan(null);
+    }
+  }, [currentUser]);
 
   const handleFileSelect = useCallback(async (files: File[]) => {
     if (!files || files.length === 0) return;
@@ -42,11 +66,29 @@ export default function HomePage() {
       return;
     }
 
+    const userId = currentUser?.uid ?? null;
+    const limitStatus = checkConversionLimit(userId);
+    if (!limitStatus.allowed) {
+      setLimitDialogContent({
+        userType: currentUser ? 'loggedIn' : 'guest',
+        timeToWaitFormatted: limitStatus.timeToWaitMs ? formatTime(limitStatus.timeToWaitMs) : undefined,
+        onPlan: limitStatus.onPlan,
+        planName: limitStatus.planName,
+        isPlanExhausted: limitStatus.isPlanExhausted,
+      });
+      setShowLimitDialog(true);
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
     setDownloadUrl(null);
+    setPdfPageCount(null);
     setSelectedFile(file);
     setLoadingStep("Starting...");
+
+    // Count PDF pages for display (non-blocking)
+    file.arrayBuffer().then((buf) => getPdfPageCount(buf)).then((n) => setPdfPageCount(n)).catch(() => setPdfPageCount(null));
 
     try {
       const csvUrl = await uploadPdfAndGetCsv(file, (step) => {
@@ -54,6 +96,10 @@ export default function HomePage() {
       });
       
       setDownloadUrl(csvUrl);
+      recordConversion(userId);
+      if (currentUser) {
+        setActivePlan(getActivePlan(currentUser.uid));
+      }
       toast({ 
         title: "Success!", 
         description: "CSV is ready!" 
@@ -72,18 +118,23 @@ export default function HomePage() {
       setIsLoading(false);
       setLoadingStep("");
     }
-  }, [toast]);
+  }, [toast, currentUser]);
 
-  const handleDownload = useCallback(() => {
+  const handleDownload = useCallback(async () => {
     if (downloadUrl && selectedFile) {
+      const saved = await addToDownloadHistory(downloadUrl, selectedFile.name);
+      if (saved) {
+        toast({ title: 'Saved to Documents', description: 'This file was added to your Documents page for 24 hours.' });
+      }
       triggerDownload(downloadUrl, selectedFile.name);
     }
-  }, [downloadUrl, selectedFile]);
+  }, [downloadUrl, selectedFile, toast]);
 
   const handleClear = useCallback(() => {
     setSelectedFile(null);
     setDownloadUrl(null);
     setError(null);
+    setPdfPageCount(null);
   }, []);
 
   return (
@@ -103,7 +154,7 @@ export default function HomePage() {
             <FileUploader 
               onFilesSelect={handleFileSelect}
               disabled={isLoading}
-              isSubscribed={false}
+              isSubscribed={!!(activePlan && activePlan.usedConversions < activePlan.totalConversions)}
               dragText="Drop PDF here"
               orText="or"
               clickText="Browse files"
@@ -130,7 +181,11 @@ export default function HomePage() {
               </CardHeader>
               <CardContent>
                 <p className="text-sm">
-                  <strong>{selectedFile?.name}</strong> converted successfully!
+                  <strong>{selectedFile?.name}</strong>
+                  {pdfPageCount != null && (
+                    <span className="text-muted-foreground"> ({pdfPageCount} {pdfPageCount === 1 ? 'page' : 'pages'})</span>
+                  )}
+                  {' '}converted successfully!
                 </p>
               </CardContent>
             </Card>
@@ -152,6 +207,16 @@ export default function HomePage() {
           )}
         </CardContent>
       </Card>
+
+      <LimitDialog
+        isOpen={showLimitDialog}
+        onOpenChange={setShowLimitDialog}
+        userType={limitDialogContent.userType}
+        timeToWaitFormatted={limitDialogContent.timeToWaitFormatted}
+        onPlan={limitDialogContent.onPlan}
+        planName={limitDialogContent.planName}
+        isPlanExhausted={limitDialogContent.isPlanExhausted}
+      />
     </div>
   );
 }
