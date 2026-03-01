@@ -15,16 +15,9 @@ import LoadingSpinner from '@/components/core/loading-spinner';
 import { FileText, UploadCloud, Trash2, AlertCircle, FileSpreadsheet, Eye, Download, Combine } from 'lucide-react';
 import { format } from 'date-fns';
 import { exportToExcel } from '@/lib/excel-export';
+import { DOWNLOAD_HISTORY_STORAGE_KEY, MAX_FILE_COUNT, type StoredExcelFile } from '@/lib/download-history-storage';
 
-const MAX_FILE_COUNT = 12;
-const STORAGE_KEY = 'XLSCONVERT_DOWNLOADED_FILES';
 const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
-
-interface StoredExcelFile {
-    name: string;
-    data: Array<Array<string | number | null>>;
-    timestamp: number;
-}
 
 // --- Main Component ---
 export default function DocumentsPage() {
@@ -38,7 +31,7 @@ export default function DocumentsPage() {
     const fetchStoredFiles = useCallback(() => {
         setIsLoading(true);
         if (typeof window !== 'undefined') {
-            const storedData = localStorage.getItem(STORAGE_KEY);
+            const storedData = localStorage.getItem(DOWNLOAD_HISTORY_STORAGE_KEY);
             if (storedData) {
                 try {
                     const files: StoredExcelFile[] = JSON.parse(storedData);
@@ -52,11 +45,11 @@ export default function DocumentsPage() {
 
                     // Clean up expired files from localStorage
                     if (recentFiles.length !== files.length) {
-                        localStorage.setItem(STORAGE_KEY, JSON.stringify(recentFiles));
+                        localStorage.setItem(DOWNLOAD_HISTORY_STORAGE_KEY, JSON.stringify(recentFiles));
                     }
                 } catch (error) {
                     console.error("Error parsing stored files:", error);
-                    localStorage.removeItem(STORAGE_KEY); // Clear corrupted data
+                    localStorage.removeItem(DOWNLOAD_HISTORY_STORAGE_KEY); // Clear corrupted data
                 }
             }
         }
@@ -80,7 +73,7 @@ export default function DocumentsPage() {
     
     const handleClearHistory = () => {
         if (typeof window !== 'undefined') {
-            localStorage.removeItem(STORAGE_KEY);
+            localStorage.removeItem(DOWNLOAD_HISTORY_STORAGE_KEY);
             setStoredFiles([]);
             toast({ title: "History Cleared", description: "Your local download history has been cleared." });
         }
